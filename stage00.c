@@ -62,7 +62,14 @@ Vec3d cameraUp = {0.0f, 1.0f, 0.0f};
 float cameraDistance;
 Vec3d cameraRotation;
 
-Vec3d objects[MAX_DROPS];
+
+typedef struct {
+  Vec3d     position;
+  float     rotation;
+  float     velocity;
+} Disc;
+
+Disc discs[MAX_DROPS];
 int objectCount;
 
 int CURRENT_GFX;
@@ -114,11 +121,12 @@ void initStage00() {
   timer = 0;
 
   for (i=0; i<MAX_DROPS;i++){
-    objects[i].x = NULL;
-    objects[i].y = NULL;
-    objects[i].z = NULL;
+    discs[i].position.x = NULL;
+    discs[i].position.y = NULL;
+    discs[i].position.z = NULL;
+    discs[i].rotation = 0.0f;
+    discs[i].velocity = 0.0f;
   }
-
   objectCount = 0;
 
 }
@@ -178,12 +186,19 @@ void updateGame00() {
   stickMoveX = contdata[0].stick_x/80.0f;
   stickMoveY = contdata[0].stick_y/80.0f;
 
+
+  //moving the object
   forwardVelocity = stickMoveY*5;
   objectAngle += stickMoveX/15;
 
   xLocation = xLocation + forwardVelocity*cos(objectAngle);
   zLocation = zLocation + forwardVelocity*sin(objectAngle);
 
+  //moving the discs
+  for(i=0; i<objectCount;i++){
+    discs[i].position.x = discs[i].position.x + discs[i].velocity*cos(discs[i].rotation);
+    discs[i].position.z = discs[i].position.z + discs[i].velocity*sin(discs[i].rotation);
+  }
   // if(   (xVelocity > ( stickMoveX *  maxXVelocity ) && stickMoveX >= 0.0f )
   //       ||
   //       (xVelocity < ( stickMoveX *  maxXVelocity ) && stickMoveX <= 0.0f) ){
@@ -215,7 +230,7 @@ void updateGame00() {
   // zLocation = zLocation - zVelocity;// * accelerationSpeed;
 
 
-  
+  //moving the camera
   cameraPos.x = xLocation + ( cameraDistance * sin(cameraRotation.x) * cos(cameraRotation.y) );
   cameraPos.y = height + ( cameraDistance * sin(cameraRotation.y)  );
   cameraPos.z = zLocation + ( cameraDistance * cos(cameraRotation.x) * cos(cameraRotation.y) );
@@ -340,7 +355,7 @@ void makeDL00() {
 
       CURRENT_GFX++;
 
-      guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f,0.0f,0.0f,1.0f, objects[i].x, 50 + 30*sin(objects[i].y +(float)timer/30.0f), objects[i].z);
+      guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer + -(discs[i].rotation*(180/M_PI)) ,0.0f,1.0f, discs[i].position.x, 50 + 30*sin(discs[i].position.y +(float)timer/30.0f), discs[i].position.z);
 
       gSPMatrix(displayListPtr++,
         OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
@@ -372,6 +387,10 @@ void makeDL00() {
     NU_GFX_UCODE_F3DEX, // load the 'F3DEX' version graphics microcode, which runs on the RCP to process this display list
     NU_SC_SWAPBUFFER // tells NuSystem to immediately display the frame on screen after the RCP finishes rendering it
   );
+
+  /*
+  ---------------------------start debug on screen-------------------------------------
+  */
   nuDebConTextPos(0,0,0);
   sprintf(conbuf,"count: %d, I: %d",objectCount, i);
   nuDebConCPuts(0, conbuf);
@@ -380,13 +399,15 @@ void makeDL00() {
     nuDebConTextPos(0,0,i);
     
     if(objectCount == i){
-      sprintf(conbuf,"%d:\t%5.1f <\n",i,objects[i].x);
+      sprintf(conbuf,"%d:\t%5.1f <\n",i,discs[i].position.x);
     } else {  
-      sprintf(conbuf,"%d:\t%5.1f     \n",i,objects[i].x);
+      sprintf(conbuf,"%d:\t%5.1f     \n",i,discs[i].position.x);
     }
     nuDebConCPuts(0, conbuf);
   }
-
+  /*
+  ---------------------------end debug on screen-------------------------------------
+  */
   /*  character written to frame buffer */
   nuDebConDisp(NU_SC_SWAPBUFFER);
 }
@@ -439,11 +460,13 @@ void placeObj() {
           nuAuSndPlayerPlay(4);
         }
         objectCount = objectCount % MAX_DROPS;
-        // objects[i].x = ((int)(xLocation/150))*150;
-        objects[i].x = xLocation;
-        objects[i].y = timer;
-        // objects[i].z = ((int)(zLocation/150))*150;
-        objects[i].z = zLocation;
+        // discs[i].x = ((int)(xLocation/150))*150;
+        discs[i].position.x = xLocation;
+        discs[i].position.y = timer;
+        // discs[i].z = ((int)(zLocation/150))*150;
+        discs[i].position.z = zLocation;
+        discs[i].rotation = objectAngle;
+        discs[i].velocity = 20.0f;
         break;
       }
     }
