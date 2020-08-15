@@ -5,8 +5,10 @@
 #include "graphic.h"
 #include "main.h"
 #include "stage00.h"
-// #include "n64logo.h"
+#include "n64logo.h"
 #include "speaker.h"
+#include "kabe.h"
+#include "texture.h"
 
 
 #define MAX_DROPS 11
@@ -71,6 +73,8 @@ typedef struct {
 
 Disc discs[MAX_DROPS];
 int objectCount;
+int isHit;
+int range;
 
 int CURRENT_GFX;
 int i;
@@ -128,7 +132,8 @@ void initStage00() {
     discs[i].velocity = 0.0f;
   }
   objectCount = 0;
-
+  isHit = FALSE;
+  range = 30;
 }
 
 // the 'update' function
@@ -240,6 +245,19 @@ void updateGame00() {
   cameraTarget.z = zLocation;
 
   soundCheck();
+
+  /* check contact with n64 */
+  for( i =0; i< objectCount;i++){
+    if ( discs[i].position.x < 550 + range && discs[i].position.x > 550 - range){
+      if( discs[i].position.z < 550 + range && discs[i].position.z > 550 - range){
+        if ( isHit == FALSE ) {
+          nuAuSndPlayerPlay(5);
+        }
+        isHit = TRUE;
+      }
+    }
+  }
+  
 }
 // the 'draw' function
 void makeDL00() {
@@ -307,7 +325,7 @@ void makeDL00() {
     CURRENT_GFX = 0;
     // Vec3d* square;
     // square = &squares[0];
-    guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, -(objectAngle*(180/M_PI)), 0.0f, 1.0f, xLocation, height, zLocation);
+    guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, -(objectAngle*(180/M_PI))+90, 0.0f, 1.0f, xLocation, height, zLocation);
 
     gSPMatrix(displayListPtr++,
       OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
@@ -326,7 +344,7 @@ void makeDL00() {
     //   G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
     // );
     
-    drawN64Logo();
+    drawHead();
 
     // pop the matrix that we added back off the stack, to move the drawing position 
     // back to where it was before we rendered this object
@@ -350,6 +368,21 @@ void makeDL00() {
     );
     drawSquare();
     gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+
+    if( isHit == FALSE){
+      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+      CURRENT_GFX++;
+      guTranslate(&gfxTask->objectTransforms[CURRENT_GFX], 550.0f,0.0f,550.0f);
+      gSPMatrix(displayListPtr++,
+        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+        G_MTX_PUSH | // ...push another matrix onto the stack...
+        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+      );
+      drawN64Logo();
+      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    }
+    
 
     for(i=0;i<objectCount; ++i){
 
@@ -392,7 +425,7 @@ void makeDL00() {
   ---------------------------start debug on screen-------------------------------------
   */
   nuDebConTextPos(0,0,0);
-  sprintf(conbuf,"count: %d, I: %d",objectCount, i);
+  sprintf(conbuf,"x: %2.0f, z: %2.0f       ",xLocation, zLocation);
   nuDebConCPuts(0, conbuf);
 
   for (i=1;i<MAX_DROPS;i++){
@@ -406,7 +439,7 @@ void makeDL00() {
     nuDebConCPuts(0, conbuf);
   }
   /*
-  ---------------------------end debug on screen-------------------------------------
+  ---------------------------end debug on screen---------------------------------------
   */
   /*  character written to frame buffer */
   nuDebConDisp(NU_SC_SWAPBUFFER);
@@ -428,8 +461,11 @@ Vtx squareVerts[] __attribute__((aligned (16))) = {
 };
 
 void drawSquare() {
+  
   // load vertex data for the triangles
   gSPVertex(displayListPtr++, &(squareVerts[0]), 4, 0);
+
+
   // depending on which graphical features, the RDP might need to spend 1 or 2
   // cycles to render a primitive, and we need to tell it which to do
   gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
@@ -473,6 +509,19 @@ void placeObj() {
   }
 }
 // this is an example of rendering a model defined as a set of static display lists
+void drawHead() {
+  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
+  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER);
+  
+  // The gSPDisplayList command causes the RCP to render a static display list,
+  // then return to this display list afterwards. These 4 display lists are
+  // defined in n64logo.h, and were generated from a 3D model using a conversion
+  // script.
+  gSPDisplayList(displayListPtr++, kiyaata2_mdl_model0);
+  gDPPipeSync(displayListPtr++);
+}
 void drawN64Logo() {
   gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
   gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
@@ -483,12 +532,10 @@ void drawN64Logo() {
   // then return to this display list afterwards. These 4 display lists are
   // defined in n64logo.h, and were generated from a 3D model using a conversion
   // script.
-  // gSPDisplayList(displayListPtr++, N64Yellow_PolyList);
-  // gSPDisplayList(displayListPtr++, N64Red_PolyList);
-  // gSPDisplayList(displayListPtr++, N64Blue_PolyList);
-  // gSPDisplayList(displayListPtr++, N64Green_PolyList);
-
-  gSPDisplayList(displayListPtr++, Wtx_speaker);
+  gSPDisplayList(displayListPtr++, N64Red_PolyList);
+  gSPDisplayList(displayListPtr++, N64Green_PolyList);
+  gSPDisplayList(displayListPtr++, N64Blue_PolyList);
+  gSPDisplayList(displayListPtr++, N64Yellow_PolyList);
   gDPPipeSync(displayListPtr++);
 }
 

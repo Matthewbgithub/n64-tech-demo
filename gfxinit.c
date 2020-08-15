@@ -10,15 +10,9 @@ static Vp vp = {
     SCREEN_WD*2, SCREEN_HT*2, G_MAXZ/2, 0,	/* The scale factor  */
     SCREEN_WD*2, SCREEN_HT*2, G_MAXZ/2, 0,	/* Move  */
 };
-Lights1 default_sun_light = gdSPDefLights1(120,
-                                           120,
-                                           120, /* weak ambient light */
-                                           255,
-                                           255,
-                                           255, /* white light */
-                                           80,
-                                           80,
-                                           0);
+Lights1 sun_light = gdSPDefLights1(  80,  80,  80, /* no ambient light */
+				   200, 200, 200, /* white light */
+				   0,   -1,   1);
 /*
   The initialization of RDP 
 */
@@ -36,8 +30,9 @@ Gfx setup_rdpstate[] = {
 Gfx setup_rspstate[] = {
   gsSPViewport(&vp),
   gsSPClearGeometryMode(0xFFFFFFFF),
-  gsSPSetGeometryMode(G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH | G_CULL_BACK),
-  gsSPSetLights1(default_sun_light),
+  gsSPClearGeometryMode((G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH | 
+			   G_CULL_BOTH | G_LIGHTING)),
   gsSPTexture(0, 0, 0, 0, G_OFF),
+  gsSPSetLights1(sun_light),
   gsSPEndDisplayList(),
 };
