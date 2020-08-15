@@ -6,4 +6,4 @@ This is a simple game created using the NuSystem demos and demo available [here]
 
 To play the game, download a release and load with an emulator or build using the same procedure in the readme [here](https://github.com/jsdf/n64-sdk-demo).
 
-Recommended emulators for compaitibility are [Mupen64Plus](https://mupen64plus.org/) (cross platform) and [Sixtyforce](https://sixtyforce.com/).
+Recommended emulators for compatibility are [Mupen64Plus](https://mupen64plus.org/) (cross platform) and [Sixtyforce](https://sixtyforce.com/).
