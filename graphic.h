@@ -26,6 +26,10 @@ typedef struct Vec3d {
   float z;
 } Vec3d;
 
+typedef struct {
+  int x;
+  int y;
+} int2d;
 
 // a struct to hold graphics data used by the RCP which can change at runtime
 typedef struct GraphicsTask {

@@ -6,10 +6,10 @@
 #include "main.h"
 #include "stage00.h"
 #include "n64logo.h"
-#include "speaker.h"
+#include "book.h"
 #include "kabe.h"
 #include "texture.h"
-
+#include "triangle.h"
 
 #define MAX_DROPS 11
 
@@ -19,43 +19,15 @@
 #include <nualsgi.h>
 #endif
 
-// the positions of the squares we're gonna draw
-// 
 
 
-// this is a boolean but the older version of C used by the N64 compiler
-// (roughly C89), doesn't have a bool type, so we just use integers
-
-// int showN64Logo;
-int zoomOut;
 float height;
 float stickMoveX;
 float stickMoveY;
-float stickXWithDecel;
-float stickYWithDecel;
 float xLocation;
 float zLocation;
-float xVelocity;
-float zVelocity;
-float maxXVelocity;
-float maxZVelocity;
-float accelerationSpeed;
-float decelerationSpeed;
-
-// float theta;
-
-// float lastx;
-// float lasty;
-// float lastz;
-// float currentx;
-// float currenty;
-// float currentz;
-
-// double num;
-// float result;
-// double result2;
+int returnedToCenter;
 float objectAngle;
-float forwardVelocity;
 
 Vec3d cameraPos = {0.0f, 0.0f, 0.0f};
 Vec3d cameraTarget = {0.0f, 0.0f, 0.0f};
@@ -76,8 +48,19 @@ int objectCount;
 int isHit;
 int range;
 
+/* ---board structure--- */
+typedef struct {
+  int content; 
+} boardSquare;
+int boardSize;
+boardSquare board[9][9];
+float sqaureSize;
+int2d cursorPos = {0,0};
+/*----------------------*/
+
 int CURRENT_GFX;
 int i;
+int o;
 int timer;
 
 
@@ -86,34 +69,16 @@ void initStage00() {
   // the advantage of initializing these values here, rather than statically, is
   // that if you switch stages/levels, and later return to this stage, you can
   // call this function to reset these values.
-  // showN64Logo = FALSE;
-
+  
   //moving values
-  zoomOut = FALSE;
-  height = 50;
+  height = 10;
   stickMoveX = 0;
   stickMoveY = 0;
-  stickXWithDecel = 0;
-  stickYWithDecel = 0;
   xLocation = 0;
   zLocation = 0;
-  xVelocity = 0;
-  zVelocity = 0;
-  // maxXVelocity = 20.0f;
-  // maxZVelocity = 20.0f;
-  // accelerationSpeed = 0.6f; 
-  // decelerationSpeed = 0.8f; //multiplied by every frame
-
-  // theta = 0.0f;
-  // currentx = xLocation;
-  // currenty = zLocation;
-  // currentz = xMod;
-  // lastx = currentx;
-  // lasty = currenty;
-  // lastz = currentz;
+  returnedToCenter = TRUE;
 
   objectAngle = 0.0f;
-  forwardVelocity = 0.0f;
 
   cameraPos.x = xLocation;
   cameraPos.y = height;
@@ -134,6 +99,15 @@ void initStage00() {
   objectCount = 0;
   isHit = FALSE;
   range = 30;
+
+  /*initialise board size and scale*/
+  boardSize = 9;
+  for (i=0;i<boardSize;i++){
+    for (o=0;o<boardSize;o++){
+      board[i][o].content = NULL;
+    }
+  }
+  sqaureSize = 50;
 }
 
 // the 'update' function
@@ -152,15 +126,10 @@ void updateGame00() {
   } else {
      if (contdata[0].trigger & A_BUTTON){
       //when a button is pressed, reset the scene
-      placeObj();
+      placeCounter();
     }
     if (contdata[0].button & B_BUTTON){
-      // when B button is held, change squares into n64 logos
-      // showN64Logo = TRUE;
-      zoomOut = TRUE;
-    } else {
-      zoomOut = FALSE;
-      // showN64Logo = FALSE;
+      //nothing lol, maybe could skip turn?
     }
   }
 
@@ -193,48 +162,50 @@ void updateGame00() {
 
 
   //moving the object
-  forwardVelocity = stickMoveY*5;
-  objectAngle += stickMoveX/15;
-
-  xLocation = xLocation + forwardVelocity*cos(objectAngle);
-  zLocation = zLocation + forwardVelocity*sin(objectAngle);
-
-  //moving the discs
-  for(i=0; i<objectCount;i++){
-    discs[i].position.x = discs[i].position.x + discs[i].velocity*cos(discs[i].rotation);
-    discs[i].position.z = discs[i].position.z + discs[i].velocity*sin(discs[i].rotation);
+  if((stickMoveX != 0 || stickMoveY != 0 )&& returnedToCenter == TRUE){
+    returnedToCenter = FALSE;
+    if ( abs(stickMoveX*100) > abs(stickMoveY*100) ){
+      //moving left right
+      if ( stickMoveX < 0){
+        if( cursorPos.x != 0){
+          //stops cursor going below 0
+          cursorPos.x -=1;
+        }
+      } else {
+        if( cursorPos.x != boardSize-1){
+          // stops cursor going over max
+          cursorPos.x +=1;
+        }
+      }
+    } else {
+      //moving up down
+      if ( stickMoveY < 0){
+        if( cursorPos.y != boardSize-1){
+          // stops cursor going over max
+          cursorPos.y +=1;
+        }
+      } else {
+        if( cursorPos.y != 0){
+          //stops cursor going below 0
+          cursorPos.y -=1;
+        }
+      }
+    }
   }
-  // if(   (xVelocity > ( stickMoveX *  maxXVelocity ) && stickMoveX >= 0.0f )
-  //       ||
-  //       (xVelocity < ( stickMoveX *  maxXVelocity ) && stickMoveX <= 0.0f) ){
-  //   //over the max velocity so decrease
-  //   xVelocity = xVelocity * decelerationSpeed;
-  //   // if(xVelocity <= 0.0f){
-  //   //   xVelocity = 0.0f;
-  //   // }
-  // }else{
-  //   //increase it
-  //   xVelocity = xVelocity + (stickMoveX * accelerationSpeed);
+
+  if(returnedToCenter == FALSE && stickMoveX == 0 && stickMoveY == 0){
+    returnedToCenter = TRUE;
+  }
+
+  //moving the cursor
+  xLocation = cursorPos.x*sqaureSize;
+  zLocation = cursorPos.y*sqaureSize;
+  //moving the discs
+  // for(i=0; i<objectCount;i++){
+  //   discs[i].position.x = discs[i].position.x + discs[i].velocity*cos(discs[i].rotation);
+  //   discs[i].position.z = discs[i].position.z + discs[i].velocity*sin(discs[i].rotation);
   // }
-
-  // if( (zVelocity > ( stickMoveY * maxZVelocity ) && stickMoveY >= 0.0f)
-  //     ||
-  //     (zVelocity < ( stickMoveY *  maxZVelocity ) && stickMoveY <= 0.0f) ){
-  //   //lower it
-  //   zVelocity = zVelocity * decelerationSpeed;
-  //   // if(yVelocity <= 0.0f){
-  //   //   yVelocity = 0.0f;
-  //   // }
-  // }else{
-  //   //increase it
-  //   zVelocity = zVelocity + (stickMoveY * accelerationSpeed);
-  // }
-  /*object moving calculation
-                20      +    0-1    *      1   */
-  // xLocation = xLocation + xVelocity;// * accelerationSpeed;
-  // zLocation = zLocation - zVelocity;// * accelerationSpeed;
-
-
+ 
   //moving the camera
   cameraPos.x = xLocation + ( cameraDistance * sin(cameraRotation.x) * cos(cameraRotation.y) );
   cameraPos.y = height + ( cameraDistance * sin(cameraRotation.y)  );
@@ -244,19 +215,19 @@ void updateGame00() {
   cameraTarget.y = height;
   cameraTarget.z = zLocation;
 
-  soundCheck();
+  // soundCheck();
 
   /* check contact with n64 */
-  for( i =0; i< objectCount;i++){
-    if ( discs[i].position.x < 550 + range && discs[i].position.x > 550 - range){
-      if( discs[i].position.z < 550 + range && discs[i].position.z > 550 - range){
-        if ( isHit == FALSE ) {
-          nuAuSndPlayerPlay(5);
-        }
-        isHit = TRUE;
-      }
-    }
-  }
+  // for( i =0; i< objectCount;i++){
+  //   if ( discs[i].position.x < 550 + range && discs[i].position.x > 550 - range){
+  //     if( discs[i].position.z < 550 + range && discs[i].position.z > 550 - range){
+  //       if ( isHit == FALSE ) {
+  //         nuAuSndPlayerPlay(5);
+  //       }
+  //       isHit = TRUE;
+  //     }
+  //   }
+  // }
   
 }
 // the 'draw' function
@@ -343,8 +314,8 @@ void makeDL00() {
     //   G_MTX_PUSH | // ...push another matrix onto the stack...
     //   G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
     // );
+    drawN64Logo();
     
-    drawHead();
 
     // pop the matrix that we added back off the stack, to move the drawing position 
     // back to where it was before we rendered this object
@@ -354,10 +325,10 @@ void makeDL00() {
     guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
     0.0f, //angle it to be flat
     0.0f, 0.0f, 
-    10.0f, //scale big
-    0.0f,  //x
+    2.5f * boardSize, //scale based on square size
+    (sqaureSize*boardSize)/2.0f - sqaureSize/2,  //x
     0.0f,//y move down
-    0.0f); //z
+    (sqaureSize*boardSize)/2.0f - sqaureSize/2); //z
 
     // guTranslate(&gfxTask->objectTransforms[1], 0.0f, -200.0f, 0.0f);
     gSPMatrix(displayListPtr++,
@@ -372,14 +343,14 @@ void makeDL00() {
     if( isHit == FALSE){
       gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
       CURRENT_GFX++;
-      guTranslate(&gfxTask->objectTransforms[CURRENT_GFX], 550.0f,0.0f,550.0f);
+      guTranslate(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f,0.0f,0.0f);
       gSPMatrix(displayListPtr++,
         OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
         G_MTX_MODELVIEW | // operating on the modelview matrix stack...
         G_MTX_PUSH | // ...push another matrix onto the stack...
         G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
       );
-      drawN64Logo();
+      drawHead();
       gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
     }
     
@@ -425,19 +396,19 @@ void makeDL00() {
   ---------------------------start debug on screen-------------------------------------
   */
   nuDebConTextPos(0,0,0);
-  sprintf(conbuf,"x: %2.0f, z: %2.0f       ",xLocation, zLocation);
+  sprintf(conbuf,"x: %f, y: %f",xLocation, zLocation);
   nuDebConCPuts(0, conbuf);
 
-  for (i=1;i<MAX_DROPS;i++){
-    nuDebConTextPos(0,0,i);
+  // for (i=1;i<MAX_DROPS;i++){
+  //   nuDebConTextPos(0,0,i);
     
-    if(objectCount == i){
-      sprintf(conbuf,"%d:\t%5.1f <\n",i,discs[i].position.x);
-    } else {  
-      sprintf(conbuf,"%d:\t%5.1f     \n",i,discs[i].position.x);
-    }
-    nuDebConCPuts(0, conbuf);
-  }
+  //   if(objectCount == i){
+  //     sprintf(conbuf,"%d:\t%5.1f <\n",i,discs[i].position.x);
+  //   } else {  
+  //     sprintf(conbuf,"%d:\t%5.1f     \n",i,discs[i].position.x);
+  //   }
+  //   nuDebConCPuts(0, conbuf);
+  // }
   /*
   ---------------------------end debug on screen---------------------------------------
   */
@@ -454,10 +425,10 @@ void makeDL00() {
 // attribute `__attribute__((aligned (16)))`, to force it to be 16-byte aligned.
 Vtx squareVerts[] __attribute__((aligned (16))) = {
   //  x,   y,  z, flag, S, T,    r,    g,    b,    a
-  { -64,   0,  64,    0, 0, 0, 0x00, 0xff, 0x00, 0xff  },
-  {  64,   0,  64,    0, 0, 0, 0x00, 0x00, 0x00, 0xff  },
-  {  64,   0, -64,    0, 0, 0, 0x00, 0x00, 0xff, 0xff  },
-  { -64,   0, -64,    0, 0, 0, 0xff, 0x00, 0x00, 0xff  },
+  { -10,   0,  10,    0, 0, 0, 0x00, 0xff, 0x00, 0xff  },
+  {  10,   0,  10,    0, 0, 0, 0x00, 0x00, 0x00, 0xff  },
+  {  10,   0, -10,    0, 0, 0, 0x00, 0x00, 0xff, 0xff  },
+  { -10,   0, -10,    0, 0, 0, 0xff, 0x00, 0x00, 0xff  },
 };
 
 void drawSquare() {
@@ -484,7 +455,7 @@ void drawSquare() {
   // the case that subsequent commands change rendering settings.
   gDPPipeSync(displayListPtr++);
 }
-void placeObj() {
+void placeCounter() {
   if( objectCount <= MAX_DROPS ){
     for (i = 0; i < MAX_DROPS; i++) {
       //check which number is next to store
@@ -510,16 +481,16 @@ void placeObj() {
 }
 // this is an example of rendering a model defined as a set of static display lists
 void drawHead() {
-  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
-  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
-  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
-  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER);
-  
-  // The gSPDisplayList command causes the RCP to render a static display list,
-  // then return to this display list afterwards. These 4 display lists are
-  // defined in n64logo.h, and were generated from a 3D model using a conversion
-  // script.
-  gSPDisplayList(displayListPtr++, kiyaata2_mdl_model0);
+  gDPSetRenderMode(displayListPtr++,G_RM_ZB_OPA_SURF, G_RM_ZB_OPA_SURF2);
+    
+	gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+	gSPSetGeometryMode(displayListPtr++, G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH |
+			   G_LIGHTING | G_CULL_BACK);
+
+	gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+	gDPSetCombineMode(displayListPtr++,G_CC_DECALRGB, G_CC_DECALRGB);
+
+	gSPDisplayList(displayListPtr++,kabe_mdl_model0);
   gDPPipeSync(displayListPtr++);
 }
 void drawN64Logo() {
@@ -532,86 +503,87 @@ void drawN64Logo() {
   // then return to this display list afterwards. These 4 display lists are
   // defined in n64logo.h, and were generated from a 3D model using a conversion
   // script.
-  gSPDisplayList(displayListPtr++, N64Red_PolyList);
-  gSPDisplayList(displayListPtr++, N64Green_PolyList);
-  gSPDisplayList(displayListPtr++, N64Blue_PolyList);
-  gSPDisplayList(displayListPtr++, N64Yellow_PolyList);
+  // gSPDisplayList(displayListPtr++, N64Red_PolyList);
+  // gSPDisplayList(displayListPtr++, N64Green_PolyList);
+  // gSPDisplayList(displayListPtr++, N64Blue_PolyList);
+  // gSPDisplayList(displayListPtr++, N64Yellow_PolyList);
+  gSPDisplayList(displayListPtr++, Wtx_triangle);
   gDPPipeSync(displayListPtr++);
 }
 
 /* Provide playback and control of audio by the button of the controller */
-void soundCheck(void)
-{
-  static int snd_no = 0;
-  static int seq_no = 0;
+// void soundCheck(void)
+// {
+//   static int snd_no = 0;
+//   static int seq_no = 0;
 
-  /* Change music of sequence playback depending on the top and bottom of 
-  the cross key */
-  if((contdata[0].trigger & U_JPAD) || (contdata[0].trigger & D_JPAD))
-    {
-      if(contdata[0].trigger & U_JPAD)
-	{
-	  seq_no--;
-	  if(seq_no < 0) seq_no = 2;
-	}
-      else
-	{
-	  seq_no++;
-	  if(seq_no > 2) seq_no = 0;
-	}	  
+//   /* Change music of sequence playback depending on the top and bottom of 
+//   the cross key */
+//   if((contdata[0].trigger & U_JPAD) || (contdata[0].trigger & D_JPAD))
+//     {
+//       if(contdata[0].trigger & U_JPAD)
+// 	{
+// 	  seq_no--;
+// 	  if(seq_no < 0) seq_no = 2;
+// 	}
+//       else
+// 	{
+// 	  seq_no++;
+// 	  if(seq_no > 2) seq_no = 0;
+// 	}	  
 
-      nuAuSeqPlayerStop(0);
-      nuAuSeqPlayerSetNo(0,seq_no);
-      nuAuSeqPlayerPlay(0);
-    }
+//       nuAuSeqPlayerStop(0);
+//       nuAuSeqPlayerSetNo(0,seq_no);
+//       nuAuSeqPlayerPlay(0);
+//     }
 
-  /* Possible to play audio in order by right and left of the cross key */
-  if((contdata[0].trigger & L_JPAD) || (contdata[0].trigger & R_JPAD))
-    {
-      if(contdata[0].trigger & L_JPAD)
-	{
-	  snd_no--;
-	  if(snd_no < 0) snd_no = 10;
-	}
-      else
-	{
-	  snd_no++;
-	  if(snd_no > 10) snd_no = 0;
-	}	  
+//   /* Possible to play audio in order by right and left of the cross key */
+//   if((contdata[0].trigger & L_JPAD) || (contdata[0].trigger & R_JPAD))
+//     {
+//       if(contdata[0].trigger & L_JPAD)
+// 	{
+// 	  snd_no--;
+// 	  if(snd_no < 0) snd_no = 10;
+// 	}
+//       else
+// 	{
+// 	  snd_no++;
+// 	  if(snd_no > 10) snd_no = 0;
+// 	}	  
 
-      /* Eleven sounds (sound data items) are provided.  Of these, the first 10 are sampled at 44 KHz and the 11th at 24 KHz. */
-      nuAuSndPlayerPlay(snd_no); 
-      if(snd_no < 10)
-	nuAuSndPlayerSetPitch(44100.0/32000);
-      else
-	nuAuSndPlayerSetPitch(24000.0/32000);
-    }
+//       /* Eleven sounds (sound data items) are provided.  Of these, the first 10 are sampled at 44 KHz and the 11th at 24 KHz. */
+//       nuAuSndPlayerPlay(snd_no); 
+//       if(snd_no < 10)
+// 	nuAuSndPlayerSetPitch(44100.0/32000);
+//       else
+// 	nuAuSndPlayerSetPitch(24000.0/32000);
+//     }
 
-  /* Change tempo of sequence playback by the L and R buttons */
-  if((contdata[0].trigger & L_TRIG) || (contdata[0].trigger & R_TRIG))
-    {
-      s32 tmp;
-      tmp = nuAuSeqPlayerGetTempo(0);
+//   /* Change tempo of sequence playback by the L and R buttons */
+//   if((contdata[0].trigger & L_TRIG) || (contdata[0].trigger & R_TRIG))
+//     {
+//       s32 tmp;
+//       tmp = nuAuSeqPlayerGetTempo(0);
 
-      if(contdata[0].trigger & L_TRIG)
-	{
-	  tmp /= 10;
-	  tmp *= 8;
-	}
-      else
-	{
-	  tmp /= 10;
-	  tmp *= 12;
-	}
-      nuAuSeqPlayerSetTempo(0,tmp);
-    }
+//       if(contdata[0].trigger & L_TRIG)
+// 	{
+// 	  tmp /= 10;
+// 	  tmp *= 8;
+// 	}
+//       else
+// 	{
+// 	  tmp /= 10;
+// 	  tmp *= 12;
+// 	}
+//       nuAuSeqPlayerSetTempo(0,tmp);
+//     }
 
-  /* Fade out sound by pushing the Z button */
-  if(contdata[0].trigger & Z_TRIG)
-    {
-      nuAuSeqPlayerFadeOut(0,200);
-    }
-}
+//   /* Fade out sound by pushing the Z button */
+//   if(contdata[0].trigger & Z_TRIG)
+//     {
+//       nuAuSeqPlayerFadeOut(0,200);
+//     }
+// }
 
 // the nusystem callback for the stage, called once per frame
 void stage00(int pendingGfx)
