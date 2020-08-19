@@ -83,13 +83,18 @@ Gfx Vtx_triangle_mesh01_dl[] __attribute__((aligned (16))) = {
 };
 
 Gfx Wtx_triangle[] __attribute__((aligned (16))) = {
-	gsSPCullDisplayList(0, 7),
-	gsSPTexture(0xffff, 0xffff, 0, G_TX_RENDERTILE, G_ON),
+	// gsSPCullDisplayList(0, 7),
+	gsSPTexture(0x8000, 0x8000, 0, G_TX_RENDERTILE, G_ON),
 	gsDPSetCombineMode(G_CC_MODULATERGBDECALA, G_CC_MODULATERGBDECALA),
-	  gsDPLoadTextureBlock(Text_triangle_lighttexture_diff, G_IM_FMT_RGBA, G_IM_SIZ_16b,32,32,0, 
-	  	  G_TX_WRAP|G_TX_NOMIRROR, G_TX_WRAP|G_TX_NOMIRROR,5,5, G_TX_NOLOD, G_TX_NOLOD), 
-	  gsSPDisplayList(Vtx_triangle_mesh01_dl),
-	  gsSPEndDisplayList()
+	gsDPLoadTextureBlock(Text_triangle_lighttexture_diff, 
+		G_IM_FMT_RGBA, 
+		G_IM_SIZ_16b,
+		32,32,
+		0, G_TX_MIRROR, 
+		G_TX_MIRROR,
+		5,5, G_TX_NOLOD, G_TX_NOLOD), 
+	gsSPDisplayList(Vtx_triangle_mesh01_dl),
+	gsSPEndDisplayList()
 };
 
 #define TRIANGLE_MODEL_MESH_COUNT 1

@@ -1,15 +1,17 @@
 
 #include <assert.h>
 #include <nusys.h> 
-
+/*includes */
 #include "graphic.h"
 #include "main.h"
 #include "stage00.h"
+/* my models */
+#include "pebble.h"
+#include "triangle.h"
+/*borrowed models for testing*/
 #include "n64logo.h"
-#include "book.h"
 #include "kabe.h"
 #include "texture.h"
-#include "triangle.h"
 
 #define MAX_DROPS 11
 
@@ -52,9 +54,10 @@ int range;
 typedef struct {
   int content; 
 } boardSquare;
-int boardSize;
+int squareCount;
 boardSquare board[9][9];
 float sqaureSize;
+float boardSize;
 int2d cursorPos = {0,0};
 /*----------------------*/
 
@@ -101,13 +104,14 @@ void initStage00() {
   range = 30;
 
   /*initialise board size and scale*/
-  boardSize = 9;
-  for (i=0;i<boardSize;i++){
-    for (o=0;o<boardSize;o++){
+  squareCount = 9;
+  for (i=0;i<squareCount;i++){
+    for (o=0;o<squareCount;o++){
       board[i][o].content = NULL;
     }
   }
   sqaureSize = 50;
+  boardSize = sqaureSize*squareCount;
 }
 
 // the 'update' function
@@ -172,7 +176,7 @@ void updateGame00() {
           cursorPos.x -=1;
         }
       } else {
-        if( cursorPos.x != boardSize-1){
+        if( cursorPos.x != squareCount-1){
           // stops cursor going over max
           cursorPos.x +=1;
         }
@@ -180,7 +184,7 @@ void updateGame00() {
     } else {
       //moving up down
       if ( stickMoveY < 0){
-        if( cursorPos.y != boardSize-1){
+        if( cursorPos.y != squareCount-1){
           // stops cursor going over max
           cursorPos.y +=1;
         }
@@ -198,8 +202,8 @@ void updateGame00() {
   }
 
   //moving the cursor
-  xLocation = cursorPos.x*sqaureSize;
-  zLocation = cursorPos.y*sqaureSize;
+  xLocation = cursorPos.x*sqaureSize - (boardSize/2 - sqaureSize/2);
+  zLocation = cursorPos.y*sqaureSize - (boardSize/2 - sqaureSize/2);
   //moving the discs
   // for(i=0; i<objectCount;i++){
   //   discs[i].position.x = discs[i].position.x + discs[i].velocity*cos(discs[i].rotation);
@@ -207,13 +211,15 @@ void updateGame00() {
   // }
  
   //moving the camera
-  cameraPos.x = xLocation + ( cameraDistance * sin(cameraRotation.x) * cos(cameraRotation.y) );
-  cameraPos.y = height + ( cameraDistance * sin(cameraRotation.y)  );
-  cameraPos.z = zLocation + ( cameraDistance * cos(cameraRotation.x) * cos(cameraRotation.y) );
-
-  cameraTarget.x = xLocation;
+  cameraTarget.x = 0.0f;
   cameraTarget.y = height;
-  cameraTarget.z = zLocation;
+  cameraTarget.z = 0.0f;
+
+  cameraPos.x = cameraTarget.x + ( cameraDistance * sin(cameraRotation.x) * cos(cameraRotation.y) );
+  cameraPos.y = cameraTarget.y + ( cameraDistance * sin(cameraRotation.y)  );
+  cameraPos.z = cameraTarget.z + ( cameraDistance * cos(cameraRotation.x) * cos(cameraRotation.y) );
+
+  
 
   // soundCheck();
 
@@ -314,7 +320,7 @@ void makeDL00() {
     //   G_MTX_PUSH | // ...push another matrix onto the stack...
     //   G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
     // );
-    drawN64Logo();
+    drawPebble();
     
 
     // pop the matrix that we added back off the stack, to move the drawing position 
@@ -325,10 +331,10 @@ void makeDL00() {
     guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
     0.0f, //angle it to be flat
     0.0f, 0.0f, 
-    2.5f * boardSize, //scale based on square size
-    (sqaureSize*boardSize)/2.0f - sqaureSize/2,  //x
+    2.5f * squareCount, //scale based on square size
+    0.0f,  //x
     0.0f,//y move down
-    (sqaureSize*boardSize)/2.0f - sqaureSize/2); //z
+    0.0f); //z
 
     // guTranslate(&gfxTask->objectTransforms[1], 0.0f, -200.0f, 0.0f);
     gSPMatrix(displayListPtr++,
@@ -340,7 +346,7 @@ void makeDL00() {
     drawSquare();
     gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
 
-    if( isHit == FALSE){
+    if( isHit != FALSE){
       gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
       CURRENT_GFX++;
       guTranslate(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f,0.0f,0.0f);
@@ -493,7 +499,7 @@ void drawHead() {
 	gSPDisplayList(displayListPtr++,kabe_mdl_model0);
   gDPPipeSync(displayListPtr++);
 }
-void drawN64Logo() {
+void drawPebble() {
   gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
   gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
   gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
@@ -507,7 +513,8 @@ void drawN64Logo() {
   // gSPDisplayList(displayListPtr++, N64Green_PolyList);
   // gSPDisplayList(displayListPtr++, N64Blue_PolyList);
   // gSPDisplayList(displayListPtr++, N64Yellow_PolyList);
-  gSPDisplayList(displayListPtr++, Wtx_triangle);
+  // gSPDisplayList(displayListPtr++, Wtx_triangle);
+  gSPDisplayList(displayListPtr++, Wtx_pebble);
   gDPPipeSync(displayListPtr++);
 }
 
