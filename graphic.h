@@ -12,7 +12,7 @@
 #define MAX_DISPLAY_LIST_COMMANDS 2048
 // determines the number of matrices we allocate, because we need one for every
 // object we want to position in the world, for each graphics task
-#define MAX_OBJECTS 20
+#define MAX_OBJECTS 128
 
 #define FOVY 45
 #define ASPECT (f32)SCREEN_WD/(f32)SCREEN_HT
@@ -26,11 +26,15 @@ typedef struct Vec3d {
   float z;
 } Vec3d;
 
-typedef struct {
+typedef struct int2d{
   int x;
   int y;
 } int2d;
 
+typedef struct Vec2d{
+  float x;
+  float y;
+} Vec2d;
 // a struct to hold graphics data used by the RCP which can change at runtime
 typedef struct GraphicsTask {
   Mtx projection;
