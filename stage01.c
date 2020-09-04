@@ -638,7 +638,9 @@ void makeDL01() {
   nuDebConTextPos(0,0,3);
   sprintf(conbuf,"Turns: %d",turnCount);
   nuDebConCPuts(0, conbuf);
-
+  nuDebConTextPos(0,0,4); 
+  sprintf(conbuf,"Stage no: %d",stage);
+  nuDebConCPuts(0, conbuf);
   // nuDebConTextPos(0,0,8);
   // sprintf(conbuf,"White is 1 and black is 2: %d ",debugNumber);
   // nuDebConCPuts(0, conbuf);
