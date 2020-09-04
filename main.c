@@ -2,7 +2,7 @@
 #include <nusys.h>
 #include "main.h"
 #include "segment.h"
-#include "stage00.h"
+#include "stage01.h"
 
 #ifdef N_AUDIO
 #include <nualsgi_n.h>
@@ -30,10 +30,10 @@ void mainproc(void)
   setAudioData();
 
   // initialize the level
-  initStage00();
+  initStage01();
 
   // set the update+draw callback to be called every frame
-  nuGfxFuncSet((NUGfxFunc)stage00);
+  nuGfxFuncSet((NUGfxFunc)stage01);
 
   // enable video output
   nuGfxDisplayOn();

@@ -37,7 +37,7 @@ TARGETS =	matt.n64
 
 HFILES =	main.h graphic.h segment.h 
 
-CODEFILES   = 	main.c stage00.c graphic.c gfxinit.c
+CODEFILES   = 	main.c stage01.c graphic.c gfxinit.c
 
 CODEOBJECTS =	$(CODEFILES:.c=.o)  $(NUSYSLIBDIR)/nusys.o
 

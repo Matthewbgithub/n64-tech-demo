@@ -98,8 +98,6 @@ int i;
 int o;
 int k;
 int timer;
-int debugNumber;
-int debugNumbertwo;
 
 float stickMoveX;
 float stickMoveY;
@@ -161,7 +159,6 @@ void initStage00() {
   maxTurns = 30;
   gameOver = FALSE;  
   resetCaptureGroup();
-  debugNumber = 0;
 }
 
 // the 'update' function
@@ -187,8 +184,6 @@ void updateGame00() {
         //nothing lol, maybe could skip turn?
         // removePebble(cursorPos.x,cursorPos.y);
 
-        // debugNumber = (*board[cursorPos.x][cursorPos.y].content).colour;
-        debugNumbertwo = board[cursorPos.x][cursorPos.y].isEmpty;
       }
     }
     moveCamera();
@@ -221,7 +216,6 @@ void updateGame00() {
   
 }
 void takeTurn(){
-    debugNumber = 0;
     placeCounter();
     checkForCaptures();
     checkGameOver();
@@ -398,10 +392,12 @@ void checkForCaptures(){
   for(i=0;i<squareCount; ++i){   
     for(o=0;o<squareCount; ++o){
       if(board[i][o].isEmpty == FALSE){
+        // osSyncPrintf("\n-----A capture chain has begun-----\n");
         resetCaptureGroup();
         // set values for current check
         currentCaptureGroupReachedEmpty = FALSE;
         currentCaptureGroupColour = (*board[i][o].content).colour;
+        // osSyncPrintf("Starting from %d,%d, colour is: %d\n",i,o,currentCaptureGroupColour);
         // add current to list of pebbles checked
         pebblesInCurrentCaptureGroup[currentCaptureGroupIndex].x = i;
         pebblesInCurrentCaptureGroup[currentCaptureGroupIndex].y = o;
@@ -411,6 +407,7 @@ void checkForCaptures(){
         // after the checks occured the spaces put into the array should be the current territory to capture,
         // if the checks never reached an empty space then capture the pieces
         if(currentCaptureGroupReachedEmpty == FALSE){
+          // osSyncPrintf("-------The capture group found an enclosed section!-----\n");
           // capture pieces
           for(k=0;k<currentCaptureGroupIndex;++k){
             removePebble(pebblesInCurrentCaptureGroup[k].x,pebblesInCurrentCaptureGroup[k].y);
@@ -421,32 +418,38 @@ void checkForCaptures(){
   }
 }
 void startCheckingFromHere(int x, int y){
-  checkCapturesContinues(x+1,y  );
+  // osSyncPrintf("expanding checking from %d,%d\n",x,y);
+  checkCapturesContinues(x+1,y);
   checkCapturesContinues(x  ,y+1);
   checkCapturesContinues(x-1,y  );
-  checkCapturesContinues(x  ,y-1);
+  checkCapturesContinues(x  ,y-1  );
 }
 void checkCapturesContinues(int x, int y){
-  if(isOffBoard(x,y) == FALSE && isInCurrentCaptureGroup(x,y) == FALSE){
+  // osSyncPrintf("continue checking %d,%d\n",x,y);
+  if(isOffBoard(x,y) == FALSE){
     if(board[x][y].isEmpty == TRUE){
       // Found an empty space in the capture, so stop altogether
+      // osSyncPrintf("%d,%d reached empty\n",x,y);
       currentCaptureGroupReachedEmpty = TRUE;
 
     //  only continue if the space is on the board, same colour as the current group, and other checks haven't found empty space.
-    }else if(currentCaptureGroupReachedEmpty == FALSE){
+    }else if(currentCaptureGroupReachedEmpty == FALSE && isInCurrentCaptureGroup(x,y) == FALSE){
       if(currentCaptureGroupColour == (*board[x][y].content).colour){
         pebblesInCurrentCaptureGroup[currentCaptureGroupIndex].x = x;
         pebblesInCurrentCaptureGroup[currentCaptureGroupIndex].y = y;
         currentCaptureGroupIndex++;
+        // osSyncPrintf("%d,%d was correct and the search continues\n",x,y);
         startCheckingFromHere(x,y);
       }
     }
   }
 }
 int isInCurrentCaptureGroup(int x, int y){
-  debugNumber++;
+  // osSyncPrintf("/\\/\\ welcome to the isInCUrrentCaptureGroup function! /\\/\\\n");
   for(k=0;k<currentCaptureGroupIndex;k++){
-    if(pebblesInCurrentCaptureGroup[currentCaptureGroupIndex].x == x && pebblesInCurrentCaptureGroup[currentCaptureGroupIndex].y == y){
+    // osSyncPrintf("comparing at index: %d",k);
+    // osSyncPrintf("x: %d, y: %d",pebblesInCurrentCaptureGroup[k].x,pebblesInCurrentCaptureGroup[k].y);
+    if(pebblesInCurrentCaptureGroup[k].x == x && pebblesInCurrentCaptureGroup[k].y == y){
       return TRUE;
     }
   }
@@ -627,21 +630,15 @@ void makeDL00() {
   // nuDebConCPuts(0, conbuf);
 
   nuDebConTextPos(0,0,0);
-  sprintf(conbuf,"White: %d",whiteScore);
-  nuDebConCPuts(0, conbuf);
-  nuDebConTextPos(0,0,1);
-  sprintf(conbuf,"Black: %d",blackScore);
-  nuDebConCPuts(0, conbuf);
-  nuDebConTextPos(0,0,3);
-  sprintf(conbuf,"Turns: %d",turnCount);
+  sprintf(conbuf,"STAGE 0");
   nuDebConCPuts(0, conbuf);
 
-  nuDebConTextPos(0,0,8);
-  sprintf(conbuf,"White is 1 and black is 2: %d ",debugNumber);
-  nuDebConCPuts(0, conbuf);
-  nuDebConTextPos(0,0,9);
-  sprintf(conbuf,"True is 1 and false is 0: %d ",debugNumbertwo);
-  nuDebConCPuts(0, conbuf);
+  // nuDebConTextPos(0,0,8);
+  // sprintf(conbuf,"White is 1 and black is 2: %d ",debugNumber);
+  // nuDebConCPuts(0, conbuf);
+  // nuDebConTextPos(0,0,9);
+  // sprintf(conbuf,"True is 1 and false is 0: %d ",debugNumbertwo);
+  // nuDebConCPuts(0, conbuf);
   // if(board[0][0].isEmpty == FALSE){
   //   nuDebConTextPos(0,0,1);
   //   sprintf(conbuf,"0,0: %d",(*board[0][0].content).colour);
