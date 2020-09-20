@@ -4,33 +4,16 @@
 /*includes */
 #include "graphic.h"
 #include "main.h"
+#include "globals.h"
 #include "stage01.h"
+//atan function
 #include "math.c"
 /* my models */
 #include "pebble_black.h"
 #include "pebble_white.h"
-#include "triangle.h"
 #include "cross_by_three.h"
-/*borrowed models for testing*/
-#include "n64logo.h"
-#include "kabe.h"
-#include "texture.h"
 
 #define MAX_DROPS 100
-
-#ifdef N_AUDIO
-#include <nualsgi_n.h>
-#else
-#include <nualsgi.h>
-#endif
-
-#ifndef WHITE
-#define WHITE    1
-#endif  /* WHITE */
-
-#ifndef BLACK
-#define BLACK   2
-#endif  /* BLACK */
 
 
 Lights1 sun_light = gdSPDefLights1(	200,200,200,           /* ambient color red = purple * yellow */
@@ -485,7 +468,7 @@ void makeDL01() {
   // initialize the projection matrix, similar to glPerspective() or glm::perspective()
   guPerspective(&gfxTask->projection, &perspNorm, FOVY, ASPECT, NEAR_PLANE,
                 FAR_PLANE, 1.0);
-
+  
   // Our first actual displaylist command. This writes the command as a value at
   // the tail of the current display list, and we increment the display list
   // tail pointer, ready for the next command to be written.
@@ -499,6 +482,7 @@ void makeDL01() {
   guLookAt(&gfxTask->modelview, cameraPos.x, cameraPos.y,
            cameraPos.z, cameraTarget.x, cameraTarget.y,
            cameraTarget.z, cameraUp.x, cameraUp.y, cameraUp.z);
+           
   // guLookAt(&gfxTask->modelview, -xLocation - 400.0f, zLocation,
   //          cameraPos.z, -xLocation, zLocation,
   //          cameraTarget.z, cameraUp.x, cameraUp.y, cameraUp.z);
@@ -590,7 +574,7 @@ void makeDL01() {
     }
 
     CURRENT_GFX++;
-    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal, 0.1f, zGoal);
+    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal, 1.0f, zGoal);
     gSPMatrix(displayListPtr++,
         OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
         G_MTX_MODELVIEW | // operating on the modelview matrix stack...
@@ -641,6 +625,8 @@ void makeDL01() {
   nuDebConTextPos(0,0,4); 
   sprintf(conbuf,"Stage no: %d",stage);
   nuDebConCPuts(0, conbuf);
+
+
   // nuDebConTextPos(0,0,8);
   // sprintf(conbuf,"White is 1 and black is 2: %d ",debugNumber);
   // nuDebConCPuts(0, conbuf);
@@ -689,7 +675,7 @@ void drawSquare() {
   // reset any rendering flags set when drawing the previous primitive
   gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
   // enable smooth (gourad) shading and z-buffering
-  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER);
+  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
 
   // actually draw the triangles, using the specified vertices
   gSP2Triangles(displayListPtr++,0,1,2,0,0,2,3,0);
@@ -700,20 +686,6 @@ void drawSquare() {
   gDPPipeSync(displayListPtr++);
 }
 
-// this is an example of rendering a model defined as a set of static display lists
-// void drawHead() {
-//   gDPSetRenderMode(displayListPtr++,G_RM_ZB_OPA_SURF, G_RM_ZB_OPA_SURF2);
-    
-// 	gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
-// 	gSPSetGeometryMode(displayListPtr++, G_ZBUFFER | G_SHADE | G_SHADING_SMOOTH |
-// 			   G_LIGHTING | G_CULL_BACK);
-
-// 	gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
-// 	gDPSetCombineMode(displayListPtr++,G_CC_DECALRGB, G_CC_DECALRGB);
-
-// 	gSPDisplayList(displayListPtr++,kabe_mdl_model0);
-//   gDPPipeSync(displayListPtr++);
-// }
 // void drawPebble() {
 //   gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
 //   gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);

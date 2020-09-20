@@ -13,6 +13,7 @@
 */
 
 #include <nusys.h>
+#include "main.h"
 
 /* Use all graphic microcodes */
 beginseg
@@ -32,6 +33,13 @@ beginseg
         include "$(ROOT)/usr/lib/PR/gspF3DLX2.Rej.fifo.o"
 	include "$(ROOT)/usr/lib/PR/gspS2DEX2.fifo.o"
 endseg
+
+beginseg
+	name	"moviedata"
+	after code
+	flags	OBJECT
+	include "textureData.o"
+endseg 
 
 beginseg
 	name "midibank"
@@ -66,10 +74,11 @@ endseg
 beginwave
 	name	"squaresdemo"
 	include	"code"
+	include "moviedata"
 	include "miditable"
 	include "midibank"
+	include "seq"
 	include "sfxbank"
 	include "sfxtable"
-	include "seq"
 endwave
 

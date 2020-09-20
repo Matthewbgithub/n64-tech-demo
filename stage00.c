@@ -4,7 +4,13 @@
 /*includes */
 #include "graphic.h"
 #include "main.h"
+#include "globals.h"
 #include "stage00.h"
+#include "title.h"
+
+#include "skybox.h"
+/*borrowed stuff */
+// #include "texture.c"
 
 #ifdef N_AUDIO
 #include <nualsgi_n.h>
@@ -12,9 +18,17 @@
 #include <nualsgi.h>
 #endif
 
+
+int gfxtwo;
+int menuTimer;
+float skyscale;
+float scaletwo;
+
 // the 'setup' function
 void initStage00() {  
-  
+  menuTimer = 0;
+  skyscale = 1.0f;
+  scaletwo = 1.0f;
 }
 
 // the 'update' function
@@ -24,9 +38,23 @@ void updateGame00() {
   nuContDataGetEx(contdata, 0);
   
     if (contdata[0].trigger & START_BUTTON){
+      /* Remove the call-back function.  */
+      nuGfxFuncRemove();
       //when a button is pressed, reset the scene
       stage = 1;
     }
+    if (contdata[0].button & A_BUTTON){
+      skyscale+=0.1f;
+    }else if(contdata[0].button & B_BUTTON){
+      skyscale-=0.1f;
+    }
+    if (contdata[0].button & Z_TRIG){
+      scaletwo+=0.1f;
+    }else if(contdata[0].button & R_TRIG){
+      scaletwo-=0.1f;
+    }
+    
+  menuTimer++;
   
 }
 
@@ -34,7 +62,6 @@ void updateGame00() {
 void makeDL00() {
   unsigned short perspNorm;
   GraphicsTask * gfxTask;
-  
   char conbuf[30];
   
   
@@ -42,18 +69,18 @@ void makeDL00() {
   // also updates the displayListPtr global variable
   gfxTask = gfxSwitchTask(); 
   
-
   // prepare the RCP for rendering a graphics task
   gfxRCPInit();
 
   // clear the color framebuffer and Z-buffer, similar to glClear()
   gfxClearCfb();
  
-  // initialize the projection matrix, similar to glPerspective() or glm::perspective()
-  guPerspective(&gfxTask->projection, &perspNorm, FOVY, ASPECT, NEAR_PLANE,
-                FAR_PLANE, 1.0);
+    guOrtho(&gfxTask->projection,
+	  -(float)SCREEN_WD/2.0F, (float)SCREEN_WD/2.0F,
+	  -(float)SCREEN_HT/2.0F, (float)SCREEN_HT/2.0F,
+	  -100.0F, 100.0F, 1.0F);
 
-  gSPPerspNormalize(displayListPtr++, perspNorm);
+  gfxtwo = 0;
 
   gSPMatrix(
     displayListPtr++,
@@ -63,35 +90,47 @@ void makeDL00() {
     G_MTX_NOPUSH // don't push another matrix onto the stack before operation
   );
 
-  gSPMatrix(displayListPtr++,
-    OS_K0_TO_PHYSICAL(&(gfxTask->modelview)),
-    // similarly this combination means "replace the modelview matrix with this new matrix"
-    G_MTX_MODELVIEW | G_MTX_NOPUSH | G_MTX_LOAD
-  );
-
-  {		
-        guPosition(&gfxTask->objectTransforms[0], 0.0f, 0.0f, 0.0f, 0.6f, 0.0f, 0.0f, 0.0f);
-        gSPMatrix(displayListPtr++,
-            OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[0])),
-            G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-            G_MTX_PUSH | // ...push another matrix onto the stack...
-            G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-        );
-        drawSquareMENU();
-        // pop the matrix that we added back off the stack, to move the drawing position 
-        // back to where it was before we rendered this object
-        gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-  }
+  // gSPMatrix(displayListPtr++,
+  //   OS_K0_TO_PHYSICAL(&(gfxTask->modelview)),
+  //   // similarly this combination means "replace the modelview matrix with this new matrix"
+  //   G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH 
+  // );
   
-  // mark the end of the display list
+  
+  guPosition(&gfxTask->objectTransforms[gfxtwo], 
+              90.0f,0.0f,0.0f, // rotation
+              1.0f,             // scale
+              0.0f, 0.0f, -100.0f);// translation
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
+  );
+  gfxtwo++;
+  guScale(&gfxTask->objectTransforms[gfxtwo], 
+              5.4f, 1.0f, 4.1f ); // xyz scale
+  
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH
+  );
+  /* Read the texture for the movie by PI */
+  // ReadMovie( 0, gfxTask );
+
+  /* Draw the texture read by MovieBuf (MovieBuf[0]~MovieBuf[3] is unused data) */
+  // DrawMovie( gfxTask, &(gfxTask->MovieBuf[4]));
+  // shadetri();
+  drawSkyBox();
+
+  
+  gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+  
+  drawTitle(gfxTask);  
+  
+ //----------------------------------------------------
   gDPFullSync(displayListPtr++);
   gSPEndDisplayList(displayListPtr++);
 
-  // assert that the display list isn't longer than the memory allocated for it,
-  // otherwise we would have corrupted memory when writing it.
-  // isn't unsafe memory access fun?
-  // this could be made safer by instead asserting on the displaylist length
-  // every time the pointer is advanced, but that would add some overhead.
+
   assert(displayListPtr - gfxTask->displayList < MAX_DISPLAY_LIST_COMMANDS);
 
   // create a graphics task to render this displaylist and send it to the RCP
@@ -106,12 +145,8 @@ void makeDL00() {
   ---------------------------start debug on screen-------------------------------------
   */
 
-  nuDebConTextPos(0,0,0);
-  sprintf(conbuf,"STAGE 0");
-  nuDebConCPuts(0, conbuf);
-
   nuDebConTextPos(0,0,4);
-  sprintf(conbuf,"---PRESS START TO START THE GAME---");
+  sprintf(conbuf," press start ~");
   nuDebConCPuts(0, conbuf);
  
   /*
@@ -120,38 +155,7 @@ void makeDL00() {
   /*  character written to frame buffer */
   nuDebConDisp(NU_SC_SWAPBUFFER);
 }
-Vtx squareVertsMENU[] __attribute__((aligned (16))) = {
-  //  x,   y,  z, flag, S, T,    r,    g,    b,    a
-  { -10,   0,  10,    0, 0, 0, 0x00, 0xff, 0x00, 0xff  },
-  {  10,   0,  10,    0, 0, 0, 0x00, 0x00, 0x00, 0xff  },
-  {  10,   0, -10,    0, 0, 0, 0x00, 0x00, 0xff, 0xff  },
-  { -10,   0, -10,    0, 0, 0, 0xff, 0x00, 0x00, 0xff  },
-};
 
-void drawSquareMENU() {
-  
-  // load vertex data for the triangles
-  gSPVertex(displayListPtr++, &(squareVertsMENU[0]), 4, 0);
-
-
-  // depending on which graphical features, the RDP might need to spend 1 or 2
-  // cycles to render a primitive, and we need to tell it which to do
-  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
-  // use antialiasing, rendering an opaque surface
-  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
-  // reset any rendering flags set when drawing the previous primitive
-  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
-  // enable smooth (gourad) shading and z-buffering
-  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER);
-
-  // actually draw the triangles, using the specified vertices
-  gSP2Triangles(displayListPtr++,0,1,2,0,0,2,3,0);
-
-  // Mark that we've finished sending commands for this particular primitive.
-  // This is needed to prevent race conditions inside the rendering hardware in 
-  // the case that subsequent commands change rendering settings.
-  gDPPipeSync(displayListPtr++);
-}
 // the nusystem callback for the stage, called once per frame
 void stage00(int pendingGfx)
 {
@@ -164,3 +168,36 @@ void stage00(int pendingGfx)
   updateGame00();
 }
 
+void drawSkyBox(){
+  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
+  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
+  gSPDisplayList(displayListPtr++, Wtx_skybox);
+  gDPPipeSync(displayListPtr++);
+}
+void drawTitle(GraphicsTask *gft){
+  gfxtwo++;
+  guPosition(&gft->objectTransforms[gfxtwo], 
+              90.0f,0.0f,-90.0f, // rotation
+              1.0f,             // scale
+              sin(menuTimer)*5, cos(menuTimer)*5-30.0f, 0.0f);// translation
+  
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
+  );
+
+  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
+  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
+  gSPDisplayList(displayListPtr++, Wtx_title_Text);
+  gDPPipeSync(displayListPtr++);
+  gSPDisplayList(displayListPtr++, Wtx_title_Text_003_Text_002);
+  gDPPipeSync(displayListPtr++);
+  gSPDisplayList(displayListPtr++, Wtx_title_Text_004_Text_003);
+  gDPPipeSync(displayListPtr++);
+
+  gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+}

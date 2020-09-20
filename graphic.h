@@ -40,7 +40,15 @@ typedef struct GraphicsTask {
   Mtx projection;
   Mtx modelview;
   Mtx objectTransforms[MAX_OBJECTS];
+
+  Mtx title_trans;
+  Mtx title_rotate;
+  Mtx title_scale;
+
   Gfx displayList[MAX_DISPLAY_LIST_COMMANDS];
+  
+  /*The buffer for movie drawing */
+  unsigned short MovieBuf[8200];
 } GraphicsTask;
 
 extern struct GraphicsTask graphicsTasks[MAX_GRAPHICS_TASKS];

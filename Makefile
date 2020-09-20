@@ -37,11 +37,11 @@ TARGETS =	matt.n64
 
 HFILES =	main.h graphic.h segment.h 
 
-CODEFILES   = 	main.c stage01.c stage00.c graphic.c gfxinit.c
+CODEFILES   = 	main.c stage00.c stage01.c graphic.c gfxinit.c 
 
 CODEOBJECTS =	$(CODEFILES:.c=.o)  $(NUSYSLIBDIR)/nusys.o
 
-DATAFILES   =	
+DATAFILES   =	texturedata.c
 
 DATAOBJECTS =	$(DATAFILES:.c=.o)
 
@@ -49,6 +49,7 @@ CODESEGMENT =	codesegment.o
 
 OBJECTS =	$(CODESEGMENT) $(DATAOBJECTS)
 
+LDIRT = $(APP)
 
 default:        $(TARGETS)
 
@@ -57,7 +58,7 @@ include $(COMMONRULES)
 $(CODESEGMENT):	$(CODEOBJECTS) Makefile
 		$(LD) -o $(CODESEGMENT) -r $(CODEOBJECTS) $(LDFLAGS)
 
-$(TARGETS):	$(OBJECTS)
+$(TARGETS) $(APP): spec	$(OBJECTS)
 		$(MAKEROM) spec -I$(NUSYSINCDIR) -r $(TARGETS) -e $(APP)
 ifdef MAKEMASK
 		makemask $(TARGETS)
