@@ -13,6 +13,9 @@
 #include "pebble_white.h"
 #include "cross_by_three.h"
 
+// borrowed bits
+#include "font.h"
+
 #define MAX_DROPS 100
 
 
@@ -60,6 +63,8 @@ float xGoal;
 float zGoal;
 int blackScore;
 int whiteScore;
+int bScoreLoc;
+int wScoreLoc;
 const Vec2d whitePotLocation = {300.0f,0.0f};
 const Vec2d blackPotLocation = {-300.0f,0.0f};
 int maxTurns;
@@ -89,6 +94,11 @@ int returnedToCenter;
 int stickResetFromTimer;
 /*-----------------------*/
 
+/*--- Debug ----*/
+int debugMode;
+float debugY;
+float debugX;
+/*--------------*/
 
 // the 'setup' function
 void initStage01() {  
@@ -141,7 +151,18 @@ void initStage01() {
   stickResetFromTimer = 0;
   maxTurns = 30;
   gameOver = FALSE;  
+
+  // debug
+  debugMode = FALSE;
+  debugX = 0.0f;
+  debugY = 0.0f;
+
+  //functions
   resetCaptureGroup();
+
+  nuAuSeqPlayerStop(0);
+  nuAuSeqPlayerSetNo(0,0);
+  nuAuSeqPlayerPlay(0);
 }
 
 // the 'update' function
@@ -169,11 +190,30 @@ void updateGame01() {
 
       }
     }
+  }
+    // debug
+    if(contdata[0].trigger & L_TRIG){
+      if( debugMode == TRUE){
+        debugMode = FALSE;
+      }else{
+        debugMode = TRUE;
+      }
+    }
+    if(debugMode == TRUE){
+      if(contdata[0].trigger & U_JPAD){
+        debugY += 1.0f;
+      }else if( contdata[0].trigger & D_JPAD){
+        debugY -= 1.0f;
+      }
+      if(contdata[0].trigger & R_JPAD){
+        debugX += 1.0f;
+      }else if( contdata[0].trigger & L_JPAD){
+        debugX -= 1.0f;
+      }
+    }
     moveCamera();
     movePebble();
-  }else{
-    
-  }
+  
   
 
   //moving the pebbles
@@ -585,7 +625,24 @@ void makeDL01() {
     gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
 
   }
+  if( gameOver == FALSE){
+    sprintf(outstring,"White - %d",whiteScore);
+    wScoreLoc = 7;
+    Draw8Font(wScoreLoc,5, TEX_COL_WHITE, 0);
+
+    sprintf(outstring,"%d - Black",blackScore);
+    bScoreLoc = 252 - 8 * numDigits(blackScore); 
+    Draw8Font(bScoreLoc,5, TEX_COL_WHITE, 0);
+
+  }else{
+    sprintf(outstring,"Game Over");
+    Draw8Font(114,100, TEX_COL_RED, 0);
+
+    sprintf(outstring,"White - %d vs %d - Black",whiteScore, blackScore);
+    Draw8Font(debugX-8*(int)numDigits(whiteScore+blackScore)/2,110, TEX_COL_WHITE, 0);
+  }
   
+
   // mark the end of the display list
   gDPFullSync(displayListPtr++);
   gSPEndDisplayList(displayListPtr++);
@@ -608,36 +665,37 @@ void makeDL01() {
   /*
   ---------------------------start debug on screen-------------------------------------
   */
-  
-  // nuDebConTextPos(0,0,0);
-  // sprintf(conbuf,"the answer is: %f",atan2bodyf(M_PI,2));
-  // nuDebConCPuts(0, conbuf);
+  if(debugMode == TRUE){
+    // nuDebConTextPos(0,0,0);
+    // sprintf(conbuf,"the answer is: %f",atan2bodyf(M_PI,2));
+    // nuDebConCPuts(0, conbuf);
 
-  nuDebConTextPos(0,0,0);
-  sprintf(conbuf,"White: %d",whiteScore);
-  nuDebConCPuts(0, conbuf);
-  nuDebConTextPos(0,0,1);
-  sprintf(conbuf,"Black: %d",blackScore);
-  nuDebConCPuts(0, conbuf);
-  nuDebConTextPos(0,0,3);
-  sprintf(conbuf,"Turns: %d",turnCount);
-  nuDebConCPuts(0, conbuf);
-  nuDebConTextPos(0,0,4); 
-  sprintf(conbuf,"Stage no: %d",stage);
-  nuDebConCPuts(0, conbuf);
+    // nuDebConTextPos(0,0,0);
+    // sprintf(conbuf,"White: %d",whiteScore);
+    // nuDebConCPuts(0, conbuf);
+    // nuDebConTextPos(0,0,1);
+    // sprintf(conbuf,"Black: %d",blackScore);
+    // nuDebConCPuts(0, conbuf);
+    // nuDebConTextPos(0,0,3);
+    // sprintf(conbuf,"Turns: %d",turnCount);
+    // nuDebConCPuts(0, conbuf);
+    // nuDebConTextPos(0,0,4); 
+    // sprintf(conbuf,"Stage no: %d",stage);
+    // nuDebConCPuts(0, conbuf);
 
 
-  // nuDebConTextPos(0,0,8);
-  // sprintf(conbuf,"White is 1 and black is 2: %d ",debugNumber);
-  // nuDebConCPuts(0, conbuf);
-  // nuDebConTextPos(0,0,9);
-  // sprintf(conbuf,"True is 1 and false is 0: %d ",debugNumbertwo);
-  // nuDebConCPuts(0, conbuf);
-  // if(board[0][0].isEmpty == FALSE){
-  //   nuDebConTextPos(0,0,1);
-  //   sprintf(conbuf,"0,0: %d",(*board[0][0].content).colour);
-  //   nuDebConCPuts(0, conbuf);
-  // }
+    nuDebConTextPos(0,0,3);
+    sprintf(conbuf,"debug:%d, %f, %f",debugMode, debugX, debugY);
+    nuDebConCPuts(0, conbuf);
+    // nuDebConTextPos(0,0,4);
+    // sprintf(conbuf,"debug:%d, %d",numDigits((int)debugY), bScoreLoc);
+    // nuDebConCPuts(0, conbuf);
+    // if(board[0][0].isEmpty == FALSE){
+    //   nuDebConTextPos(0,0,1);
+    //   sprintf(conbuf,"0,0: %d",(*board[0][0].content).colour);
+    //   nuDebConCPuts(0, conbuf);
+    // }
+  }
  
   /*
   ---------------------------end debug on screen---------------------------------------
@@ -719,6 +777,16 @@ void drawModel(modelName){
   gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
   gSPDisplayList(displayListPtr++, modelName);
   gDPPipeSync(displayListPtr++);
+}
+int numDigits(int n){
+  if( n < 10 ) return 1;
+  if( n < 100 ) return 2;
+  if( n < 1000 ) return 3;
+  if( n < 10000 ) return 4;
+  if( n < 100000 ) return 5;
+  if( n < 1000000 ) return 6;
+  if( n < 10000000 ) return 7;
+  return 8;
 }
 /* Provide playback and control of audio by the button of the controller */
 // void soundCheck(void)

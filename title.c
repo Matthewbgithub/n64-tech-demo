@@ -64,8 +64,8 @@ void
 DrawMovie( GraphicsTask* dp, unsigned short *bmp )
 {
     /* The calculation of the model coordinate system  */
-    guTranslate( &dp->title_trans, 0.0, 0.0, 1.0 );
-    guRotateRPY( &dp->title_rotate, 0.0, 0.0, 0.0 );
+    guTranslate( &dp->title_trans, 0.0, 0.0, 0.0 );
+    guRotateRPY( &dp->title_rotate, 0.0, 0.0, 90.0 );
     guScale( &dp->title_scale, 1.0, 1.0, 1.0 );
     
     /* Setting the model-matrix  */
@@ -93,7 +93,7 @@ DrawMovie( GraphicsTask* dp, unsigned short *bmp )
     gDPSetTextureLOD (displayListPtr++,G_TL_TILE);
 
     // this line changes the blending mode
-    // gDPSetTextureFilter (displayListPtr++,G_TF_BILERP);
+    gDPSetTextureFilter (displayListPtr++,G_TF_BILERP);
     gDPSetTextureConvert(displayListPtr++,G_TC_FILT);
     gDPSetTextureLUT (displayListPtr++,G_TT_NONE);
     gSPTexture(displayListPtr++,0x8000, 0x8000, 0, G_TX_RENDERTILE, G_ON);

@@ -7,10 +7,13 @@
 #include "globals.h"
 #include "stage00.h"
 #include "title.h"
-
 #include "skybox.h"
+
 /*borrowed stuff */
-// #include "texture.c"
+#include "n64logo.h"
+#include "font.h"
+#include "title.c"
+#include "texture.h"
 
 #ifdef N_AUDIO
 #include <nualsgi_n.h>
@@ -23,12 +26,35 @@ int gfxtwo;
 int menuTimer;
 float skyscale;
 float scaletwo;
+int debugMode;
+float debugY;
+float debugX;
+int transition;
+int transitionStartTime;
+float transTemp;
+
+float gAngle;
+float oAngle;
+float exclAngle;
+float screenScale;
 
 // the 'setup' function
 void initStage00() {  
   menuTimer = 0;
+  transitionStartTime = 0;
   skyscale = 1.0f;
   scaletwo = 1.0f;
+  debugMode = FALSE;
+  debugX = 0.0f;
+  debugY = 0.0f;
+  transition = FALSE;
+
+  gAngle = 0.0f;
+  oAngle = 0.0f;
+  exclAngle = 0.0f;
+  screenScale = 1.0f; 
+  nuAuSeqPlayerSetNo(0,2);
+  nuAuSeqPlayerPlay(0);
 }
 
 // the 'update' function
@@ -37,24 +63,62 @@ void updateGame00() {
   // read controller input from controller 1 (index 0)
   nuContDataGetEx(contdata, 0);
   
-    if (contdata[0].trigger & START_BUTTON){
-      /* Remove the call-back function.  */
-      nuGfxFuncRemove();
-      //when a button is pressed, reset the scene
-      stage = 1;
-    }
-    if (contdata[0].button & A_BUTTON){
-      skyscale+=0.1f;
-    }else if(contdata[0].button & B_BUTTON){
-      skyscale-=0.1f;
-    }
-    if (contdata[0].button & Z_TRIG){
-      scaletwo+=0.1f;
-    }else if(contdata[0].button & R_TRIG){
-      scaletwo-=0.1f;
+    
+
+    if( debugMode == TRUE ){
+      //debug controls
+      if (contdata[0].button & U_CBUTTONS)
+        debugY += 1.0f;
+      else if (contdata[0].button & D_CBUTTONS)
+        debugY -= 1.0f;
+      if (contdata[0].button & L_CBUTTONS)
+        debugX -= 1.0f;
+      else if (contdata[0].button & R_CBUTTONS)
+        debugX += 1.0f;
+    }else{
+      //standard actions
+      if (contdata[0].trigger & START_BUTTON){
+        nuAuSndPlayerPlay(1);
+        transitionStartTime = menuTimer;
+        transition = TRUE;
+      }
+      if (contdata[0].button & A_BUTTON){
+        skyscale+=0.1f;
+      }else if(contdata[0].button & B_BUTTON){
+        skyscale-=0.1f;
+      }
+      if (contdata[0].button & Z_TRIG){
+        scaletwo+=0.1f;
+      }else if(contdata[0].button & R_TRIG){
+        scaletwo-=0.1f;
+      }
     }
     
-  menuTimer++;
+    //switching debug mode
+    if(contdata[0].trigger & L_TRIG){
+      if(debugMode == TRUE){
+        debugMode = FALSE;
+        nuDebConClear(NU_DEB_CON_WINDOW0);
+      }else{
+        debugMode = TRUE;
+      }
+    }
+
+    if( transition == TRUE ){
+      transTemp = ((menuTimer - transitionStartTime)/10.0f);
+      screenScale = 1.0f + transTemp * transTemp * transTemp;
+      if ( screenScale >= 60.0f ){
+        nuDebConClear(NU_DEB_CON_WINDOW0);
+        nextStage();
+      }
+    }
+
+    gAngle = sin(menuTimer/4.6f)*5.0f;
+    oAngle = sin(menuTimer/6.0f)*3.0f;
+    exclAngle = sin(menuTimer/5.0f)*-5.0f;
+
+    menuTimer++;
+    // screenScale = sin(menuTimer/10.0f) + 2.0f;
   
 }
 
@@ -75,12 +139,16 @@ void makeDL00() {
   // clear the color framebuffer and Z-buffer, similar to glClear()
   gfxClearCfb();
  
+    // guOrtho(&gfxTask->projection,
+	  // -(float)SCREEN_WD/2.0F, (float)SCREEN_WD/2.0F,
+	  // -(float)SCREEN_HT/2.0F, (float)SCREEN_HT/2.0F,
+	  // -100.0F, 100.0F, 1.0F);
     guOrtho(&gfxTask->projection,
-	  -(float)SCREEN_WD/2.0F, (float)SCREEN_WD/2.0F,
-	  -(float)SCREEN_HT/2.0F, (float)SCREEN_HT/2.0F,
+	  -(float)SCREEN_WD/2.0f/(screenScale), (float)SCREEN_WD/2.0f/(screenScale),
+	  -(float)SCREEN_HT/2.0f/(screenScale), (float)SCREEN_HT/2.0f/(screenScale),
 	  -100.0F, 100.0F, 1.0F);
 
-  gfxtwo = 0;
+  gfxtwo = -1;
 
   gSPMatrix(
     displayListPtr++,
@@ -97,35 +165,30 @@ void makeDL00() {
   // );
   
   
-  guPosition(&gfxTask->objectTransforms[gfxtwo], 
-              90.0f,0.0f,0.0f, // rotation
-              1.0f,             // scale
-              0.0f, 0.0f, -100.0f);// translation
-  gSPMatrix(displayListPtr++,
-      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[gfxtwo])),
-      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
-  );
-  gfxtwo++;
-  guScale(&gfxTask->objectTransforms[gfxtwo], 
-              5.4f, 1.0f, 4.1f ); // xyz scale
   
-  gSPMatrix(displayListPtr++,
-      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[gfxtwo])),
-      G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH
-  );
   /* Read the texture for the movie by PI */
-  // ReadMovie( 0, gfxTask );
+  ReadMovie( 0, gfxTask );
 
   /* Draw the texture read by MovieBuf (MovieBuf[0]~MovieBuf[3] is unused data) */
-  // DrawMovie( gfxTask, &(gfxTask->MovieBuf[4]));
+  DrawMovie( gfxTask, &(gfxTask->MovieBuf[4]));
   // shadetri();
-  drawSkyBox();
+  // drawSkyBox(gfxTask);
 
   
   gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
   
+
   drawTitle(gfxTask);  
   
+  if(debugMode == TRUE){
+    drawDebug(gfxTask);
+  }
+  sprintf(outstring,"Press START");
+  if(transition == TRUE){
+    Draw8Font(114 ,170, (int)(menuTimer/5)%2, 0);    
+  }else{
+    Draw8Font(114 ,170, TEX_COL_WHITE, 0);
+  }
  //----------------------------------------------------
   gDPFullSync(displayListPtr++);
   gSPEndDisplayList(displayListPtr++);
@@ -144,11 +207,18 @@ void makeDL00() {
   /*
   ---------------------------start debug on screen-------------------------------------
   */
+  if ( debugMode == TRUE ){
+    nuDebConTextPos(0,0,0);
+    sprintf(conbuf,"x: %f, y:", screenScale);
+    nuDebConCPuts(0, conbuf);
+  }else{
+    // nuDebConTextPos(0,0,0);
+    // sprintf(conbuf," press start ~ %d", debugMode);
+    // nuDebConCPuts(0, conbuf);  
+  }
+  
+  
 
-  nuDebConTextPos(0,0,4);
-  sprintf(conbuf," press start ~");
-  nuDebConCPuts(0, conbuf);
- 
   /*
   ---------------------------end debug on screen---------------------------------------
   */
@@ -167,8 +237,31 @@ void stage00(int pendingGfx)
   // update the state of the world for the next frame
   updateGame00();
 }
-
-void drawSkyBox(){
+void nextStage(){
+  /* Remove the call-back function.  */
+  nuGfxFuncRemove();
+  //when a button is pressed, reset the scene
+  nuAuSeqPlayerStop(0);
+  stage = 1;
+}
+void drawSkyBox(GraphicsTask *gft){
+  gfxtwo++;
+  guPosition(&gft->objectTransforms[gfxtwo], 
+              90.0f,0.0f,0.0f, // rotation
+              1.0f,             // scale
+              0.0f, 0.0f, -100.0f);// translation
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
+  );
+  gfxtwo++;
+  guScale(&gft->objectTransforms[gfxtwo], 
+              5.4f, 1.0f, 4.1f ); // xyz scale
+  
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH
+  );
   gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
   gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
   gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
@@ -177,27 +270,63 @@ void drawSkyBox(){
   gDPPipeSync(displayListPtr++);
 }
 void drawTitle(GraphicsTask *gft){
+  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
+  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
+  
   gfxtwo++;
   guPosition(&gft->objectTransforms[gfxtwo], 
-              90.0f,0.0f,-90.0f, // rotation
+              90.0f,0.0f,-90.0f+oAngle, // rotation
               1.0f,             // scale
-              sin(menuTimer)*5, cos(menuTimer)*5-30.0f, 0.0f);// translation
+              0.0f, -30.0f, 0.0f);// translation
   
   gSPMatrix(displayListPtr++,
       OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
       G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
   );
-
-  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
-  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
-  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
-  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
   gSPDisplayList(displayListPtr++, Wtx_title_Text);
   gDPPipeSync(displayListPtr++);
+  gfxtwo++;
+  guPosition(&gft->objectTransforms[gfxtwo], 
+              90.0f,0.0f,-90.0f + gAngle, // rotation
+              1.0f,             // scale
+              0.0f, -30.0f, 0.0f);// translation
+  
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
+  );
   gSPDisplayList(displayListPtr++, Wtx_title_Text_003_Text_002);
   gDPPipeSync(displayListPtr++);
+  gfxtwo++;
+  guPosition(&gft->objectTransforms[gfxtwo], 
+              90.0f,0.0f,-90.0f + exclAngle, // rotation
+              1.0f,             // scale
+              0.0f, -30.0f, 0.0f);// translation
+  
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
+  );
   gSPDisplayList(displayListPtr++, Wtx_title_Text_004_Text_003);
   gDPPipeSync(displayListPtr++);
 
   gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+}
+void drawDebug(GraphicsTask *gft){
+  gfxtwo++;
+  guPosition(&gft->objectTransforms[gfxtwo], 
+              0.0f,0.0f,0.0f, // rotation
+              0.1f,             // scale
+              debugX, debugY, 0.0f);// translation
+  gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
+  );
+  gSPDisplayList(displayListPtr++, N64Red_PolyList);
+  gSPDisplayList(displayListPtr++, N64Green_PolyList);
+  gSPDisplayList(displayListPtr++, N64Blue_PolyList);
+  gSPDisplayList(displayListPtr++, N64Yellow_PolyList);
+  gDPPipeSync(displayListPtr++);
 }
