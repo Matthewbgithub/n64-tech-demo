@@ -17,7 +17,9 @@
 #include "font.h"
 
 #define MAX_DROPS 100
+#define MAX_PLAYERS 2
 
+extern NUContData contdata[];
 
 Lights1 sun_light = gdSPDefLights1(	200,200,200,           /* ambient color red = purple * yellow */
         														255,0,0,
@@ -47,7 +49,7 @@ typedef struct boardSquare{
 } boardSquare;
 
 Pebble pebbles[MAX_DROPS];
-int objectCount;
+int pebbleCount;
 int squareCount;
 boardSquare board[9][9];
 float sqaureSize;
@@ -55,12 +57,12 @@ float boardSize;
 /*----------------------*/
 
 /* game values --------------*/
-int2d cursorPos = {0,0};
 int turnCount;
-float xLocation;
-float zLocation;
-float xGoal;
-float zGoal;
+int2d cursorPos[MAX_PLAYERS];
+float xLocation[MAX_PLAYERS];
+float zLocation[MAX_PLAYERS];
+float xGoal[MAX_PLAYERS];
+float zGoal[MAX_PLAYERS];
 int blackScore;
 int whiteScore;
 int bScoreLoc;
@@ -69,6 +71,7 @@ const Vec2d whitePotLocation = {300.0f,0.0f};
 const Vec2d blackPotLocation = {-300.0f,0.0f};
 int maxTurns;
 int gameOver;
+int gamePause;
 /*---------------------------*/
 
 /* capture variables --------*/
@@ -86,12 +89,15 @@ int i;
 int o;
 int k;
 int timer;
+int padNo;
+s32 tempo;
 
-float stickMoveX;
-float stickMoveY;
-float moveSpeedSteps;
-int returnedToCenter;
-int stickResetFromTimer;
+//controller variables
+float stickMoveX[MAX_PLAYERS];
+float stickMoveY[MAX_PLAYERS];
+float moveSpeedSteps[MAX_PLAYERS];
+int returnedToCenter[MAX_PLAYERS];
+int stickResetFromTimer[MAX_PLAYERS];
 /*-----------------------*/
 
 /*--- Debug ----*/
@@ -106,16 +112,22 @@ void initStage01() {
   // that if you switch stages/levels, and later return to this stage, you can
   // call this function to reset these values.
   
-  //moving values
-  stickMoveX = 0;
-  stickMoveY = 0;
-  xLocation = 0;
-  zLocation = 0;
-  xGoal = xLocation;
-  zGoal = zLocation;
-  moveSpeedSteps = 20;
-  returnedToCenter = TRUE;
+  for(padNo=0;padNo<MAX_PLAYERS; padNo++){
+    //moving values
+    cursorPos[padNo].x = 0;
+    cursorPos[padNo].y = 0;
 
+    stickMoveX[padNo] = 0;
+    stickMoveY[padNo] = 0;
+    xLocation[padNo] = padNo*squareCount;
+    zLocation[padNo] = 0;
+    xGoal[padNo] = xLocation[padNo];
+    zGoal[padNo] = zLocation[padNo];
+    returnedToCenter[padNo] = TRUE;
+    moveSpeedSteps[padNo] = 20;
+    stickResetFromTimer[padNo] = 0;
+    moveCursor(padNo,0,0);
+  }
   for (i=0; i<MAX_DROPS;i++){
     pebbles[i].position.x = NULL;
     pebbles[i].position.y = NULL;
@@ -123,7 +135,8 @@ void initStage01() {
     pebbles[i].rotation = 0.0f;
     pebbles[i].colour = NULL;
   }
-  objectCount = 0;
+
+  pebbleCount = 0;
 
   /*initialise board size and scale*/
   squareCount = 9;
@@ -134,90 +147,48 @@ void initStage01() {
   }
   sqaureSize = 50;
   boardSize = sqaureSize*squareCount;
-  moveCursor(0,0);
 
-  cameraPos.x = 0.0f;
-  cameraPos.y = 0.0f;
-  cameraPos.z = 0.0f;
-  cameraDistance = 5.0f*(squareCount*squareCount) + 195.0f;
-  cameraRotation.x = 0.0f;
-  cameraRotation.y = 1.2f;
-  cameraRotation.z = 0.0f;
+  setDefaultCameraPos();
 
   timer = 0;
 	turnCount = 0;
   blackScore = 0;
   whiteScore = 0;
-  stickResetFromTimer = 0;
   maxTurns = 30;
   gameOver = FALSE;  
+  gamePause = FALSE;
 
   // debug
   debugMode = FALSE;
   debugX = 0.0f;
   debugY = 0.0f;
-
   //functions
   resetCaptureGroup();
 
   nuAuSeqPlayerStop(0);
   nuAuSeqPlayerSetNo(0,0);
   nuAuSeqPlayerPlay(0);
+  nuAuSeqPlayerSetVol(0,0x3fff);
 }
 
 // the 'update' function
 void updateGame01() {
-  timer++;
-  // read controller input from controller 1 (index 0)
-  nuContDataGetEx(contdata, 0);
-  // We check if the 'A' Button was pressed using a bitwise AND with
-  // contdata[0].trigger and the A_BUTTON constant.
-  // The contdata[0].trigger property is set only for the frame that the button is
-  // initially pressed. The contdata[0].button property is similar, but stays on
-  // for the duration of the button press.
-  if( gameOver == FALSE){
-    if (contdata[0].trigger & START_BUTTON){
-      //when a button is pressed, reset the scene
-      initStage01();
-    } else {
-      if (contdata[0].trigger & A_BUTTON){
-        //when a button is pressed, reset the scene
-        takeTurn();
-      }
-      if (contdata[0].trigger & B_BUTTON){
-        //nothing lol, maybe could skip turn?
-        // removePebble(cursorPos.x,cursorPos.y);
-
-      }
+  if(gamePause == FALSE){
+    timer++;
+  }
+  // nuContDataGetExAll(contdata);
+  for(padNo=0;padNo<MAX_PLAYERS;padNo++){
+    readController(padNo);
+    if(gamePause == FALSE){
+      movePebble(padNo);
     }
   }
-    // debug
-    if(contdata[0].trigger & L_TRIG){
-      if( debugMode == TRUE){
-        debugMode = FALSE;
-      }else{
-        debugMode = TRUE;
-      }
-    }
-    if(debugMode == TRUE){
-      if(contdata[0].trigger & U_JPAD){
-        debugY += 1.0f;
-      }else if( contdata[0].trigger & D_JPAD){
-        debugY -= 1.0f;
-      }
-      if(contdata[0].trigger & R_JPAD){
-        debugX += 1.0f;
-      }else if( contdata[0].trigger & L_JPAD){
-        debugX -= 1.0f;
-      }
-    }
-    moveCamera();
-    movePebble();
+  moveCamera();
   
   
 
   //moving the pebbles
-  // for(i=0; i<objectCount;i++){
+  // for(i=0; i<pebbleCount;i++){
   //   pebbles[i].position.x = pebbles[i].position.x + pebbles[i].velocity*cos(pebbles[i].rotation);
   //   pebbles[i].position.z = pebbles[i].position.z + pebbles[i].velocity*sin(pebbles[i].rotation);
   // }
@@ -226,7 +197,7 @@ void updateGame01() {
 
 
   /* check contact with n64 */
-  // for( i =0; i< objectCount;i++){
+  // for( i =0; i< pebbleCount;i++){
   //   if ( pebbles[i].position.x < 550 + range && pebbles[i].position.x > 550 - range){
   //     if( pebbles[i].position.z < 550 + range && pebbles[i].position.z > 550 - range){
   //       if ( isHit == FALSE ) {
@@ -238,10 +209,66 @@ void updateGame01() {
   // }
   
 }
-void takeTurn(){
-    placeCounter();
+void takeTurn(int padNo){
+    // osSyncPrintf("Turn taken from player %d", padNo);
+    placeCounter(padNo);
     checkForCaptures();
     checkGameOver();
+}
+void readController(int padNo){
+  // read controller input from controllers
+  // nuContDataGetEx(contdata, padNo);
+  // We check if the 'A' Button was pressed using a bitwise AND with
+  // contdata[0].trigger and the A_BUTTON constant.
+  // The contdata[0].trigger property is set only for the frame that the button is
+  // initially pressed. The contdata[0].button property is similar, but stays on
+  // for the duration of the button press.
+  if( gameOver == FALSE){
+    if (contdata[padNo].trigger & START_BUTTON){
+      //when a button is pressed, reset the scene
+      // initStage01();
+      if(gamePause == FALSE){
+        gamePause = TRUE;
+        setDefaultCameraPos();
+        nuAuSeqPlayerSetVol(0,0x1fff);
+      }else{
+        gamePause = FALSE;
+        nuAuSeqPlayerSetVol(0,0x3fff);
+      }
+    } else {
+      if (contdata[padNo].trigger & A_BUTTON){
+        // stops players placing a piece out of turn
+        if( turnCount % 2 == padNo){
+          takeTurn(padNo);
+        }
+      }
+      if (contdata[padNo].trigger & B_BUTTON){
+        //nothing lol, maybe could skip turn?
+        // removePebble(cursorPos[i].x,cursorPos[i].y);
+
+      }
+    }
+  }
+  // debug
+  if(contdata[padNo].trigger & L_TRIG){
+    if( debugMode == TRUE){
+      debugMode = FALSE;
+    }else{
+      debugMode = TRUE;
+    }
+  }
+  if(debugMode == TRUE){
+    if(contdata[padNo].trigger & U_JPAD){
+      debugY += 1.0f;
+    }else if( contdata[padNo].trigger & D_JPAD){
+      debugY -= 1.0f;
+    }
+    if(contdata[padNo].trigger & R_JPAD){
+      debugX += 1.0f;
+    }else if( contdata[padNo].trigger & L_JPAD){
+      debugX -= 1.0f;
+    }
+  }
 }
 void moveCamera(){
   //c buttons to move the camera round please
@@ -275,67 +302,75 @@ void moveCamera(){
   cameraPos.y = cameraTarget.y + ( cameraDistance * sin(cameraRotation.y)                         );
   cameraPos.z = cameraTarget.z + ( cameraDistance * cos(cameraRotation.x) * cos(cameraRotation.y) );
 }
-void movePebble(){
+void setDefaultCameraPos(){
+  cameraPos.x = 0.0f;
+  cameraPos.y = 0.0f;
+  cameraPos.z = 0.0f;
+  cameraDistance = 5.0f*(squareCount*squareCount) + 195.0f;
+  cameraRotation.x = 0.0f;
+  cameraRotation.y = 1.2f;
+  cameraRotation.z = 0.0f;
+}
+void movePebble(int padNo){
 	//setting values for the controller sticks, divided by 80 to reduce the range to be from 0 to 1
-  stickMoveX = contdata[0].stick_x/80.0f;
-  stickMoveY = contdata[0].stick_y/80.0f;
+  stickMoveX[padNo] = contdata[padNo].stick_x/80.0f;
+  stickMoveY[padNo] = contdata[padNo].stick_y/80.0f;
 
 
   //moving the object
-  if((stickMoveX != 0 || stickMoveY != 0 )&& returnedToCenter == TRUE){
-    returnedToCenter = FALSE;
-    if ( abs(stickMoveX*100) > abs(stickMoveY*100) ){
+  if((stickMoveX[padNo] != 0 || stickMoveY[padNo] != 0 )&& returnedToCenter[padNo] == TRUE){
+    returnedToCenter[padNo] = FALSE;
+    if ( abs(stickMoveX[padNo]*100) > abs(stickMoveY[padNo]*100) ){
       //moving left right
-      if ( stickMoveX < 0){
-				moveCursor(-1,0);
+      if ( stickMoveX[padNo] < 0){
+				moveCursor(padNo,-1,0);
       } else {
-				moveCursor(1,0);
+				moveCursor(padNo,1,0);
       }
     } else {
       //moving up down
-      if ( stickMoveY < 0){
-				moveCursor(0,1);
+      if ( stickMoveY[padNo] < 0){
+				moveCursor(padNo,0,1);
       } else {
-				moveCursor(0,-1);
+				moveCursor(padNo,0,-1);
       }
     }
   }
   if(
-    returnedToCenter == FALSE && 
-    (stickMoveX == 0 && stickMoveY == 0 || (timer - stickResetFromTimer) % 15 == 0)
+    returnedToCenter[padNo] == FALSE && 
+    (stickMoveX[padNo] == 0 && stickMoveY[padNo] == 0 || (timer - stickResetFromTimer[padNo]) % 15 == 0)
   ){
-    returnedToCenter = TRUE;
+    returnedToCenter[padNo] = TRUE;
   }
   //moving the cursor
-  xLocation += (xGoal-xLocation)/moveSpeedSteps;
-  zLocation += (zGoal-zLocation)/moveSpeedSteps;
+  xLocation[padNo] += (xGoal[padNo]-xLocation[padNo])/moveSpeedSteps[padNo];
+  zLocation[padNo] += (zGoal[padNo]-zLocation[padNo])/moveSpeedSteps[padNo];
   // adds a ease-out effect to the movement of the spinning pebble above the cursor
   // movespeed steps reaches 1 at which point the calculation above will divide by 1, and reach the x and z goal values
-  if(moveSpeedSteps<1.1){
-    moveSpeedSteps=1;
+  if(moveSpeedSteps[padNo]<1.1){
+    moveSpeedSteps[padNo]=1;
   }else{
-    moveSpeedSteps *= 0.95;
+    moveSpeedSteps[padNo] *= 0.95;
   }
 }
-void moveCursor(int xDelta, int yDelta){
+void moveCursor(int padNo, int xDelta, int yDelta){
 		//setting position of cursor & setting when the cursor can move again
 
 		//stopping border breaks
-		if(	0 <= (cursorPos.x + xDelta) && (cursorPos.x + xDelta) < squareCount &&
-				0 <= (cursorPos.y + yDelta) && (cursorPos.y + yDelta) < squareCount){
+		if(	0 <= (cursorPos[padNo].x + xDelta) && (cursorPos[padNo].x + xDelta) < squareCount &&
+				0 <= (cursorPos[padNo].y + yDelta) && (cursorPos[padNo].y + yDelta) < squareCount){
 			
-			// if( isEmpty(cursorPos.x+xDelta,cursorPos.y+yDelta) == TRUE){
-				cursorPos.x += xDelta;
-				cursorPos.y += yDelta;
+			// if( isEmpty(cursorPos[padNo].x+xDelta,cursorPos[padNo].y+yDelta) == TRUE){
+				cursorPos[padNo].x += xDelta;
+				cursorPos[padNo].y += yDelta;
 			// }		
 		}
-		//stopping collisions
 		
-    xGoal = cursorPos.x*sqaureSize - (boardSize/2 - sqaureSize/2);
-    zGoal = cursorPos.y*sqaureSize - (boardSize/2 - sqaureSize/2);
+    xGoal[padNo] = cursorPos[padNo].x*sqaureSize - (boardSize/2 - sqaureSize/2);
+    zGoal[padNo] = cursorPos[padNo].y*sqaureSize - (boardSize/2 - sqaureSize/2);
     // lower this is the faster the pebble cursor will move
-    moveSpeedSteps = 5;
-    stickResetFromTimer = timer - 1; // -1 to stop it resetting the count immediately
+    moveSpeedSteps[padNo] = 5;
+    stickResetFromTimer[padNo] = timer - 1; // -1 to stop it resetting the count immediately
   }
 void removePebble(int x, int y){
   if(board[x][y].isEmpty == FALSE){
@@ -363,32 +398,32 @@ void startPebbleRemove(Pebble *pebble){
     (*pebble).position.z = blackPotLocation.y;
   }
 }
-void placeCounter() {
-	if(board[cursorPos.x][cursorPos.y].isEmpty == TRUE){
-		if( objectCount <= MAX_DROPS ){
+void placeCounter(int padNo) {
+	if(board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty == TRUE){
+		if( pebbleCount <= MAX_DROPS ){
 			for (i = 0; i < MAX_DROPS; i++) {
 				//check which number is next to store
-				if( i == objectCount ){
-					objectCount++;
-					if( objectCount >= MAX_DROPS ){
+				if( i == pebbleCount ){
+					pebbleCount++;
+					if( pebbleCount >= MAX_DROPS ){
 						nuAuSndPlayerPlay(1);
 					}else{
 						nuAuSndPlayerPlay(4);
 					}
-					objectCount = objectCount % MAX_DROPS;
-					// pebbles[i].x = ((int)(xLocation/150))*150;
-					pebbles[i].position.x = xGoal;
+					pebbleCount = pebbleCount % MAX_DROPS;
+					// pebbles[i].x = ((int)(xLocation[padNo]/150))*150;
+					pebbles[i].position.x = xGoal[padNo];
 					pebbles[i].position.y = 10.0f;
 					// pebbles[i].z = ((int)(zLocation/150))*150;
-					pebbles[i].position.z = zGoal;
+					pebbles[i].position.z = zGoal[padNo];
 					pebbles[i].rotation = 0.0f;
 					if(turnCount%2==0){
 						pebbles[i].colour = BLACK;
 					}else{
 						pebbles[i].colour = WHITE;
 					}
-          board[cursorPos.x][cursorPos.y].content = &pebbles[i];
-          board[cursorPos.x][cursorPos.y].isEmpty = FALSE;
+          board[cursorPos[padNo].x][cursorPos[padNo].y].content = &pebbles[i];
+          board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty = FALSE;
           turnCount++;
 					break;
 				}
@@ -481,9 +516,9 @@ int isInCurrentCaptureGroup(int x, int y){
 void checkGameOver(){
   if(turnCount >= maxTurns){
     gameOver = TRUE;
-    nuAuSeqPlayerStop(0);
-    nuAuSeqPlayerSetNo(0,0);
-    nuAuSeqPlayerPlay(0);
+    // nuAuSeqPlayerStop(0);
+    // nuAuSeqPlayerSetNo(0,0);
+    // nuAuSeqPlayerPlay(0);
   }
 }
 // the 'draw' function
@@ -550,24 +585,40 @@ void makeDL01() {
 	gSPSetLights0(displayListPtr++, my_ambient_only_light);
 	gSPSetLights1(displayListPtr++, sun_light);
   {
-		CURRENT_GFX = 0;
+		CURRENT_GFX = -1;
     /* the pebble that hovers above the cursor */
-			
-		guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer*2%360, 0.0f, 0.6f, xLocation, 40 + 20*sin((float)timer/30.0f), zLocation);
-		gSPMatrix(displayListPtr++,
-			OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-			G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-			G_MTX_PUSH | // ...push another matrix onto the stack...
-			G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-		);
-		if(objectCount%2==0){
-			drawModel(Wtx_pebble_black);
-		}else{
-			drawModel(Wtx_pebble_white);
-		}
-		// pop the matrix that we added back off the stack, to move the drawing position 
-		// back to where it was before we rendered this object
-		gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+		for(padNo=0;padNo<MAX_PLAYERS;padNo++){
+      if(nuContStatus[padNo].errno != 0){
+		  continue;
+	    }
+      CURRENT_GFX++;
+      guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer*2%360, 0.0f, 0.6f, xLocation[padNo], (turnCount % 2 == padNo) ? 40 + 20*sin((float)timer/30.0f+padNo*2) : 30, zLocation[padNo]);
+      gSPMatrix(displayListPtr++,
+        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+        G_MTX_PUSH | // ...push another matrix onto the stack...
+        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+      );
+      if(padNo%2==0){
+        drawModel(Wtx_pebble_black);
+      }else{
+        drawModel(Wtx_pebble_white);
+      }
+      
+      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+      
+      CURRENT_GFX++;
+      guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 1.0f, zGoal[padNo]);
+      gSPMatrix(displayListPtr++,
+          OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+          G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+          G_MTX_PUSH | // ...push another matrix onto the stack...
+          G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+        );
+      drawSquare();
+      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    }	
+		
 
     
     for(i=0;i<(int)squareCount/3; ++i){   
@@ -592,7 +643,7 @@ void makeDL01() {
       }
     }
 
-    for(i=0;i<objectCount; ++i){
+    for(i=0;i<pebbleCount; ++i){
 
       CURRENT_GFX++;
 
@@ -611,29 +662,24 @@ void makeDL01() {
 				drawModel(Wtx_pebble_black);
 			}
       gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+
+      
     }
-
-    CURRENT_GFX++;
-    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal, 1.0f, zGoal);
-    gSPMatrix(displayListPtr++,
-        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-        G_MTX_PUSH | // ...push another matrix onto the stack...
-        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-      );
-    drawSquare();
-    gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-
   }
+  drawHudGraphic(turnCount, conbuf);
   if( gameOver == FALSE){
-    sprintf(outstring,"White - %d",whiteScore);
-    wScoreLoc = 7;
-    Draw8Font(wScoreLoc,5, TEX_COL_WHITE, 0);
+    if (gamePause == TRUE){
+      sprintf(outstring,"- Game Paused -");
+      Draw8Font(114,100, TEX_COL_RED, 0);
+    }else{
+      sprintf(outstring,"White - %d",whiteScore);
+      wScoreLoc = 7;
+      Draw8Font(wScoreLoc,5, TEX_COL_WHITE, 0);
 
-    sprintf(outstring,"%d - Black",blackScore);
-    bScoreLoc = 252 - 8 * numDigits(blackScore); 
-    Draw8Font(bScoreLoc,5, TEX_COL_WHITE, 0);
-
+      sprintf(outstring,"%d - Black",blackScore);
+      bScoreLoc = 252 - 8 * numDigits(blackScore); 
+      Draw8Font(bScoreLoc,5, TEX_COL_WHITE, 0);
+    }
   }else{
     sprintf(outstring,"Game Over");
     Draw8Font(114,100, TEX_COL_RED, 0);
@@ -684,8 +730,11 @@ void makeDL01() {
     // nuDebConCPuts(0, conbuf);
 
 
+    // nuDebConTextPos(0,0,3);
+    // sprintf(conbuf,"debug:%d, %f, %f",debugMode, debugX, debugY);
+    // nuDebConCPuts(0, conbuf);
     nuDebConTextPos(0,0,3);
-    sprintf(conbuf,"debug:%d, %f, %f",debugMode, debugX, debugY);
+    sprintf(conbuf,"tempo:%d",nuContNum);
     nuDebConCPuts(0, conbuf);
     // nuDebConTextPos(0,0,4);
     // sprintf(conbuf,"debug:%d, %d",numDigits((int)debugY), bScoreLoc);
@@ -778,6 +827,13 @@ void drawModel(modelName){
   gSPDisplayList(displayListPtr++, modelName);
   gDPPipeSync(displayListPtr++);
 }
+void drawHudGraphic(int turn){
+  if(turn % 2 == 0){
+    drawModel(Wtx_pebble_black);
+  }else{
+    drawModel(Wtx_pebble_white);
+  }
+}
 int numDigits(int n){
   if( n < 10 ) return 1;
   if( n < 100 ) return 2;
@@ -869,6 +925,8 @@ void stage01(int pendingGfx)
   // have the maximum queued up)
   if(pendingGfx < 1)
     makeDL01();
+
+  nuContDataGetExAll(contdata);
 
   // update the state of the world for the next frame
   updateGame01();

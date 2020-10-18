@@ -3,6 +3,7 @@
 #include "main.h"
 #include "segment.h"
 #include "stage01.h"
+#include "stage00.h"
 
 #ifdef N_AUDIO
 #include <nualsgi_n.h>
@@ -29,8 +30,10 @@ void initStage01(void);
 void makeDL01(void);
 void updateGame01(void);
 
-NUContData  contdata[1]; // storage for controller 1 inputs
+NUContData contdata[NU_CONT_MAXCONTROLLERS];
+// NUContData  contdata[1]; // storage for controller 1 inputs
 u8 contPattern;		     /* The pattern connected to the controller  */
+
 
 void mainproc(void)
 {

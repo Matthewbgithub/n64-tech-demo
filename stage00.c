@@ -21,6 +21,7 @@
 #include <nualsgi.h>
 #endif
 
+extern NUContData contdata[];
 
 int gfxtwo;
 int menuTimer;
@@ -61,7 +62,7 @@ void initStage00() {
 void updateGame00() {
   
   // read controller input from controller 1 (index 0)
-  nuContDataGetEx(contdata, 0);
+  // nuContDataGetEx(contdata, 0);
   
     
 
@@ -233,6 +234,8 @@ void stage00(int pendingGfx)
   // have the maximum queued up)
   if(pendingGfx < 1)
     makeDL00();
+
+  nuContDataGetExAll(contdata);
 
   // update the state of the world for the next frame
   updateGame00();
