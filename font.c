@@ -14,6 +14,7 @@
 
 /*The buffer for the font output */
 char 	outstring[100];
+char    outtwo[200];
 
 /*The texture pallet */
 u16  default_tlut[16] = {
@@ -264,7 +265,7 @@ Draw8Font( int posx, int posy, int texcol, int texsize )
     for(idx = 0; outstring[idx] != 0x0; idx++){
 	for(idx2 = 0; idx2 < 80; idx2++){
 	    if(outstring[idx] == letters_string[idx2]){
-		gDPLoadTextureTile_4b(displayListPtr++,
+		    gDPLoadTextureTile_4b(displayListPtr++,
 				      font_img+(sizeof(char))*FontIdx[idx2],
 				      G_IM_FMT_I,
 				      64, 80,
@@ -273,8 +274,8 @@ Draw8Font( int posx, int posy, int texcol, int texsize )
 				      G_TX_WRAP, G_TX_WRAP,
 				      G_TX_NOMASK, G_TX_NOMASK,
 				      G_TX_NOLOD, G_TX_NOLOD);
-		if(texsize == 0){/* 8x8 font */
-		    gSPTextureRectangle(displayListPtr++,
+		    if(texsize == 0){/* 8x8 font */
+		        gSPTextureRectangle(displayListPtr++,
 					(int)( posx + idx * 8 ) << 2,
 					(int)( posy ) << 2,
 					(int)( posx + idx * 8 + 7) << 2,
@@ -285,8 +286,8 @@ Draw8Font( int posx, int posy, int texcol, int texsize )
 					(int)(1 << 10),
 					(int)(1 << 10)
 					);
-		}else{/* 4x8 font */
-		    gSPTextureRectangle(displayListPtr++,
+		    }else{/* 4x8 font */
+		        gSPTextureRectangle(displayListPtr++,
 					(int)( posx + idx * 5 ) << 2,
 					(int)( posy ) << 2,
 					(int)( posx + idx * 8 + 4) << 2,
@@ -297,8 +298,98 @@ Draw8Font( int posx, int posy, int texcol, int texsize )
 					(int)(1 << 11),
 					(int)(1 << 10)
 					);
-		}
-		gDPPipeSync(displayListPtr++);
+		    }
+		    gDPPipeSync(displayListPtr++);
+	    }
+	    gDPPipeSync(displayListPtr++);
+	}
+    }
+}
+
+void
+drawTex( int posx, int posy, int texcol, int texsize )
+{
+    int idx, idx2;
+
+    gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+    gDPSetTextureFilter(displayListPtr++, G_TF_POINT);
+    gDPSetRenderMode(displayListPtr++, G_RM_TEX_EDGE, G_RM_TEX_EDGE);
+    
+    gSPTexture(displayListPtr++, 0xffff, 0xffff, 0, G_TX_RENDERTILE, G_ON);
+    gDPSetCombineMode(displayListPtr++, G_CC_DECALRGBA, G_CC_DECALRGBA);
+    gDPSetTexturePersp(displayListPtr++, G_TP_NONE);
+    
+    switch(texcol){
+      case TEX_COL_WHITE:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, white_tlut);
+	break;
+      case TEX_COL_BLACK:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, black_tlut);
+	break;
+      case TEX_COL_RED:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, red_tlut);
+	break;
+      case TEX_COL_GREEN:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, green_tlut);
+	break;
+      case TEX_COL_BLUE:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, blue_tlut);
+	break;
+      case TEX_COL_YELLOW:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, yellow_tlut);
+	break;
+      case TEX_COL_PURPLE:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, purple_tlut);
+	break;
+      case TEX_COL_AQUA:
+	gDPLoadTLUT_pal16(displayListPtr++,  0, aqua_tlut);
+	break;
+      default:
+	break;
+    }
+
+
+    gDPLoadTLUT_pal16(displayListPtr++, 15, default_tlut);
+    gDPSetTextureLUT(displayListPtr++, G_TT_RGBA16);
+    
+    for(idx = 0; outtwo[idx] != 0x0; idx++){
+	for(idx2 = 0; idx2 < 80; idx2++){
+	    if(outtwo[idx] == letters_string[idx2]){
+		    gDPLoadTextureTile_4b(displayListPtr++,
+				      font_img+(sizeof(char))*FontIdx[idx2],
+				      G_IM_FMT_I,
+				      64, 80,
+				      0, 0, 7, 7,
+				      0,
+				      G_TX_WRAP, G_TX_WRAP,
+				      G_TX_NOMASK, G_TX_NOMASK,
+				      G_TX_NOLOD, G_TX_NOLOD);
+		    if(texsize == 0){/* 8x8 font */
+		        gSPTextureRectangle(displayListPtr++,
+					(int)( posx + idx * 8 ) << 2,
+					(int)( posy ) << 2,
+					(int)( posx + idx * 8 + 7) << 2,
+					(int)( posy + 7 ) << 2,
+					G_TX_RENDERTILE,
+					(0 << 5),
+					(0 << 5),
+					(int)(1 << 10),
+					(int)(1 << 10)
+					);
+		    }else{/* 4x8 font */
+		        gSPTextureRectangle(displayListPtr++,
+					(int)( posx + idx * 5 ) << 2,
+					(int)( posy ) << 2,
+					(int)( posx + idx * 8 + 4) << 2,
+					(int)( posy + 7 ) << 2,
+					G_TX_RENDERTILE,
+					(0 << 6),
+					(0 << 5),
+					(int)(1 << 11),
+					(int)(1 << 10)
+					);
+		    }
+		    gDPPipeSync(displayListPtr++);
 	    }
 	    gDPPipeSync(displayListPtr++);
 	}

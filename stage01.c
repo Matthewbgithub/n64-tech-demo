@@ -12,12 +12,18 @@
 #include "pebble_black.h"
 #include "pebble_white.h"
 #include "cross_by_three.h"
+#include "boardcorners.h"
+#include "boardside.h"
+#include "table.h"
+#include "floor.h"
+#include "decal.h"
 
 // borrowed bits
 #include "font.h"
 
 #define MAX_DROPS 100
 #define MAX_PLAYERS 2
+#define MAX_MENU_ITEMS 2
 
 extern NUContData contdata[];
 
@@ -72,6 +78,8 @@ const Vec2d blackPotLocation = {-300.0f,0.0f};
 int maxTurns;
 int gameOver;
 int gamePause;
+char menuArrow[MAX_MENU_ITEMS];
+unsigned int menuSelection; // unsigned because the menu item array is only positive numbers
 /*---------------------------*/
 
 /* capture variables --------*/
@@ -112,22 +120,6 @@ void initStage01() {
   // that if you switch stages/levels, and later return to this stage, you can
   // call this function to reset these values.
   
-  for(padNo=0;padNo<MAX_PLAYERS; padNo++){
-    //moving values
-    cursorPos[padNo].x = 0;
-    cursorPos[padNo].y = 0;
-
-    stickMoveX[padNo] = 0;
-    stickMoveY[padNo] = 0;
-    xLocation[padNo] = padNo*squareCount;
-    zLocation[padNo] = 0;
-    xGoal[padNo] = xLocation[padNo];
-    zGoal[padNo] = zLocation[padNo];
-    returnedToCenter[padNo] = TRUE;
-    moveSpeedSteps[padNo] = 20;
-    stickResetFromTimer[padNo] = 0;
-    moveCursor(padNo,0,0);
-  }
   for (i=0; i<MAX_DROPS;i++){
     pebbles[i].position.x = NULL;
     pebbles[i].position.y = NULL;
@@ -147,6 +139,29 @@ void initStage01() {
   }
   sqaureSize = 50;
   boardSize = sqaureSize*squareCount;
+
+  for(padNo=0;padNo<MAX_PLAYERS; padNo++){
+    //moving values
+    cursorPos[padNo].x = padNo*(squareCount-1);
+    cursorPos[padNo].y = (int)squareCount/2;
+
+    stickMoveX[padNo] = 0;
+    stickMoveY[padNo] = 0;
+    xLocation[padNo] = cursorPos[padNo].x*sqaureSize - (boardSize/2 - sqaureSize/2);
+    zLocation[padNo] = cursorPos[padNo].y*sqaureSize - (boardSize/2 - sqaureSize/2);
+    xGoal[padNo] = xLocation[padNo];
+    zGoal[padNo] = zLocation[padNo];
+    returnedToCenter[padNo] = TRUE;
+    moveSpeedSteps[padNo] = 1;
+    stickResetFromTimer[padNo] = 0;
+    moveCursor(padNo,0,0);
+  }
+
+  menuArrow[0] = '-';
+  for(i=1;i<MAX_MENU_ITEMS;i++){
+    menuArrow[i]= ' ';
+  }
+  menuSelection = 0;
 
   setDefaultCameraPos();
 
@@ -225,8 +240,7 @@ void readController(int padNo){
   // for the duration of the button press.
   if( gameOver == FALSE){
     if (contdata[padNo].trigger & START_BUTTON){
-      //when a button is pressed, reset the scene
-      // initStage01();
+      //start button pressed and not game over'd
       if(gamePause == FALSE){
         gamePause = TRUE;
         setDefaultCameraPos();
@@ -236,16 +250,40 @@ void readController(int padNo){
         nuAuSeqPlayerSetVol(0,0x3fff);
       }
     } else {
-      if (contdata[padNo].trigger & A_BUTTON){
-        // stops players placing a piece out of turn
-        if( turnCount % 2 == padNo){
-          takeTurn(padNo);
+      if( gamePause == FALSE){
+        //game is not paused, and not game over'd
+        if (contdata[padNo].trigger & A_BUTTON){
+          // stops players placing a piece out of turn
+          if( turnCount % 2 == padNo){
+            takeTurn(padNo);
+          }
         }
-      }
-      if (contdata[padNo].trigger & B_BUTTON){
-        //nothing lol, maybe could skip turn?
-        // removePebble(cursorPos[i].x,cursorPos[i].y);
-
+      }else{
+        // game is paused, and not game over
+        if (contdata[padNo].trigger & U_JPAD){
+          menuSelection--;
+          menuSelection = menuSelection%MAX_MENU_ITEMS;
+          updateMenuArrow();
+        }else if (contdata[padNo].trigger & D_JPAD){
+          menuSelection++;
+          menuSelection = menuSelection%MAX_MENU_ITEMS;
+          updateMenuArrow();
+        }
+        if(contdata[padNo].trigger & A_BUTTON){
+          //pause menu option has been selected
+          switch (menuSelection){
+            case 0 : // continue
+              //this is the same as pressing start
+              gamePause = FALSE;
+              nuAuSeqPlayerSetVol(0,0x3fff);
+              break;
+            case 1 : // quit
+              nuGfxFuncRemove();
+              nuAuSeqPlayerStop(0);
+              stage = 0;
+              break;
+          }
+        }
       }
     }
   }
@@ -253,6 +291,7 @@ void readController(int padNo){
   if(contdata[padNo].trigger & L_TRIG){
     if( debugMode == TRUE){
       debugMode = FALSE;
+      nuDebConClear(NU_DEB_CON_WINDOW0);
     }else{
       debugMode = TRUE;
     }
@@ -306,10 +345,19 @@ void setDefaultCameraPos(){
   cameraPos.x = 0.0f;
   cameraPos.y = 0.0f;
   cameraPos.z = 0.0f;
-  cameraDistance = 5.0f*(squareCount*squareCount) + 195.0f;
+  cameraDistance = 7.0f*(squareCount*squareCount) + 195.0f;
   cameraRotation.x = 0.0f;
-  cameraRotation.y = 1.2f;
+  cameraRotation.y = 1.0f;
   cameraRotation.z = 0.0f;
+}
+void updateMenuArrow(){
+  for(i=0;i<MAX_MENU_ITEMS;i++){
+    if(menuSelection == i){
+      menuArrow[i] = '-';
+    }else{
+      menuArrow[i] = ' ';
+    }
+  }
 }
 void movePebble(int padNo){
 	//setting values for the controller sticks, divided by 80 to reduce the range to be from 0 to 1
@@ -643,6 +691,92 @@ void makeDL01() {
       }
     }
 
+    CURRENT_GFX++;
+    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+    0.0f, //angle it to be flat
+    0.0f, 0.0f, 
+    2.5f, //scale based on square size
+    -150.0f,  //x
+    0.0f,//y move down
+    -150.0f); //z
+
+    gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+      G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+      G_MTX_PUSH | // ...push another matrix onto the stack...
+      G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+    );
+    drawModel(Wtx_boardcorners);
+    gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+
+    for(i=0;i<4;i++){
+      CURRENT_GFX++;
+      guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+      0.0f, //angle it to be flat
+      i*90.0f, 0.0f, 
+      2.5f, //scale based on square size
+      0.0f,  //x
+      0.0f,//y move down
+      0.0f); //z
+
+      gSPMatrix(displayListPtr++,
+        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+        G_MTX_PUSH | // ...push another matrix onto the stack...
+        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+      );
+      if(i < 2){
+        drawModel(Wtx_boardside);
+      }else{
+        drawModel(Wtx_boardside_mirror);
+      }
+      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    }
+
+    CURRENT_GFX++;
+    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+    0.0f, //angle it to be flat
+    0.0f, 0.0f, 
+    2.5f, //scale based on square size
+    0.0f,  //x
+    0.0f,//y move down
+    0.0f); //z
+
+    gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+      G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+      G_MTX_PUSH | // ...push another matrix onto the stack...
+      G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+    );
+    drawModel(Wtx_floor);
+    gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+
+    // drawModelInPosition(gfxTask, Wtx_table, 
+    // 0.0f, //angle it to be flat
+    // 0.0f, 0.0f, 
+    // 2.5f, //scale based on square size
+    // 0.0f,  //x
+    // 0.0f,//y move down
+    // 0.0f); //z
+
+    CURRENT_GFX++;
+    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+    0.0f, //angle it to be flat
+    0.0f, 0.0f, 
+    2.5f, //scale based on square size
+    0.0f,  //x
+    0.0f,//y move down
+    0.0f); //z
+
+    gSPMatrix(displayListPtr++,
+      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+      G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+      G_MTX_PUSH | // ...push another matrix onto the stack...
+      G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+    );
+    drawModel(Wtx_table);
+    gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+
     for(i=0;i<pebbleCount; ++i){
 
       CURRENT_GFX++;
@@ -666,11 +800,16 @@ void makeDL01() {
       
     }
   }
-  drawHudGraphic(turnCount, conbuf);
+
   if( gameOver == FALSE){
     if (gamePause == TRUE){
-      sprintf(outstring,"- Game Paused -");
-      Draw8Font(114,100, TEX_COL_RED, 0);
+      // sprintf(outstring,"- Game Paused -");
+      // Draw8Font(114,100,TEX_COL_RED,0);
+      sprintf(outstring,"%c Resume", menuArrow[0]);
+      Draw8Font(114,100,TEX_COL_WHITE,0);
+
+      sprintf(outstring,"%c Quit", menuArrow[1]);
+      Draw8Font(114,120,TEX_COL_WHITE,0);
     }else{
       sprintf(outstring,"White - %d",whiteScore);
       wScoreLoc = 7;
@@ -685,8 +824,9 @@ void makeDL01() {
     Draw8Font(114,100, TEX_COL_RED, 0);
 
     sprintf(outstring,"White - %d vs %d - Black",whiteScore, blackScore);
-    Draw8Font(debugX-8*(int)numDigits(whiteScore+blackScore)/2,110, TEX_COL_WHITE, 0);
+    Draw8Font(8*(int)numDigits(whiteScore+blackScore)/2,110, TEX_COL_WHITE, 0);
   }
+  // drawHudGraphic(turnCount);
   
 
   // mark the end of the display list
@@ -730,12 +870,12 @@ void makeDL01() {
     // nuDebConCPuts(0, conbuf);
 
 
-    // nuDebConTextPos(0,0,3);
-    // sprintf(conbuf,"debug:%d, %f, %f",debugMode, debugX, debugY);
-    // nuDebConCPuts(0, conbuf);
     nuDebConTextPos(0,0,3);
-    sprintf(conbuf,"tempo:%d",nuContNum);
+    sprintf(conbuf,"debug:%d, %f, %f",menuSelection, debugX, debugY);
     nuDebConCPuts(0, conbuf);
+    // nuDebConTextPos(0,0,3);
+    // sprintf(conbuf,"tempo:%f",boardSize);
+    // nuDebConCPuts(0, conbuf);
     // nuDebConTextPos(0,0,4);
     // sprintf(conbuf,"debug:%d, %d",numDigits((int)debugY), bScoreLoc);
     // nuDebConCPuts(0, conbuf);
@@ -827,11 +967,61 @@ void drawModel(modelName){
   gSPDisplayList(displayListPtr++, modelName);
   gDPPipeSync(displayListPtr++);
 }
+// void drawModelInPosition(GraphicsTask *gft, void (*modelName), float roll, float pitch, float yaw, float scale, float transx, float transy, float transz){
+//     CURRENT_GFX++;
+//     guPosition(&gft->objectTransforms[CURRENT_GFX],
+//     roll, //angle it to be flat
+//     pitch, yaw, 
+//     scale, //scale based on square size
+//     transx,  //x
+//     transy,//y move down
+//     transz); //z
+
+//     gSPMatrix(displayListPtr++,
+//       OS_K0_TO_PHYSICAL(&(gft->objectTransforms[CURRENT_GFX])),
+//       G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+//       G_MTX_PUSH | // ...push another matrix onto the stack...
+//       G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+//     );
+//     drawModel(*modelName);
+//     gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+// }
 void drawHudGraphic(int turn){
   if(turn % 2 == 0){
-    drawModel(Wtx_pebble_black);
+    // gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+    // gDPSetTextureFilter(displayListPtr++, G_TF_POINT);
+    // gDPSetRenderMode(displayListPtr++, G_RM_TEX_EDGE, G_RM_TEX_EDGE);
+    
+    // gSPTexture(displayListPtr++, 0xffff, 0xffff, 0, G_TX_RENDERTILE, G_ON);
+    // gDPSetCombineMode(displayListPtr++, G_CC_DECALRGBA, G_CC_DECALRGBA);
+    // gDPSetTexturePersp(displayListPtr++, G_TP_NONE);
+    // gDPLoadTextureTile(displayListPtr++,
+    //   decal,
+    //   G_IM_FMT_YUV,
+    //   G_IM_SIZ_8b,
+    //   32, 32,
+    //   0,0,32,32,
+    //   0,
+    //   G_TX_NOMIRROR,G_TX_NOMIRROR,
+    //   G_TX_NOMASK, G_TX_NOMASK,
+    //   G_TX_NOLOD, G_TX_NOLOD
+    // );
+    // gSPTextureRectangle(displayListPtr++,
+    //   0,0,32,32,
+    //   G_TX_RENDERTILE,
+    //   (0 << 2),
+    //   (0 << 2),
+    //   (int)(1 << 5),
+    //   (int)(1 << 5)
+    // );
+    // gDPPipeSync(displayListPtr++);
+    // gDPPipeSync(displayListPtr++);
+    
+    sprintf(outtwo,"nooooi");
+    drawTex(10,10, TEX_COL_WHITE, 0);
   }else{
-    drawModel(Wtx_pebble_white);
+    sprintf(outtwo,"noooo");
+    drawTex(10,10, TEX_COL_WHITE, 0);
   }
 }
 int numDigits(int n){

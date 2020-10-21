@@ -17,3 +17,4 @@
 
 extern void	Draw8Font( int, int, int, int );
 extern char 	outstring[100];
+extern char   outtwo[200];

@@ -7,13 +7,11 @@
 #include "globals.h"
 #include "stage00.h"
 #include "title.h"
-#include "skybox.h"
 
 /*borrowed stuff */
-#include "n64logo.h"
 #include "font.h"
-#include "title.c"
-#include "texture.h"
+#include "movie.c"
+#include "n64logo.h"
 
 #ifdef N_AUDIO
 #include <nualsgi_n.h>
@@ -247,31 +245,31 @@ void nextStage(){
   nuAuSeqPlayerStop(0);
   stage = 1;
 }
-void drawSkyBox(GraphicsTask *gft){
-  gfxtwo++;
-  guPosition(&gft->objectTransforms[gfxtwo], 
-              90.0f,0.0f,0.0f, // rotation
-              1.0f,             // scale
-              0.0f, 0.0f, -100.0f);// translation
-  gSPMatrix(displayListPtr++,
-      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
-      G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
-  );
-  gfxtwo++;
-  guScale(&gft->objectTransforms[gfxtwo], 
-              5.4f, 1.0f, 4.1f ); // xyz scale
+// void drawSkyBox(GraphicsTask *gft){
+//   gfxtwo++;
+//   guPosition(&gft->objectTransforms[gfxtwo], 
+//               90.0f,0.0f,0.0f, // rotation
+//               1.0f,             // scale
+//               0.0f, 0.0f, -100.0f);// translation
+//   gSPMatrix(displayListPtr++,
+//       OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+//       G_MTX_MODELVIEW | G_MTX_LOAD | G_MTX_NOPUSH
+//   );
+//   gfxtwo++;
+//   guScale(&gft->objectTransforms[gfxtwo], 
+//               5.4f, 1.0f, 4.1f ); // xyz scale
   
-  gSPMatrix(displayListPtr++,
-      OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
-      G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH
-  );
-  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
-  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
-  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
-  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
-  gSPDisplayList(displayListPtr++, Wtx_skybox);
-  gDPPipeSync(displayListPtr++);
-}
+//   gSPMatrix(displayListPtr++,
+//       OS_K0_TO_PHYSICAL(&(gft->objectTransforms[gfxtwo])),
+//       G_MTX_MODELVIEW | G_MTX_MUL | G_MTX_NOPUSH
+//   );
+//   gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+//   gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
+//   gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+//   gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
+//   gSPDisplayList(displayListPtr++, Wtx_skybox);
+//   gDPPipeSync(displayListPtr++);
+// }
 void drawTitle(GraphicsTask *gft){
   gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
   gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
