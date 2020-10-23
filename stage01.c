@@ -26,6 +26,7 @@
 #define MAX_MENU_ITEMS 2
 
 extern NUContData contdata[];
+extern u32 nuScRetraceCounter;
 
 Lights1 sun_light = gdSPDefLights1(	200,200,200,           /* ambient color red = purple * yellow */
         														255,0,0,
@@ -98,7 +99,8 @@ int o;
 int k;
 int timer;
 int padNo;
-s32 tempo;
+int btn_down;
+int padNoThatPaused;
 
 //controller variables
 float stickMoveX[MAX_PLAYERS];
@@ -163,15 +165,16 @@ void initStage01() {
   }
   menuSelection = 0;
 
-  setDefaultCameraPos();
+  setDefaultCamera();
 
   timer = 0;
 	turnCount = 0;
   blackScore = 0;
   whiteScore = 0;
-  maxTurns = 30;
+  maxTurns = 3;
   gameOver = FALSE;  
   gamePause = FALSE;
+  btn_down = FALSE;
 
   // debug
   debugMode = FALSE;
@@ -243,7 +246,8 @@ void readController(int padNo){
       //start button pressed and not game over'd
       if(gamePause == FALSE){
         gamePause = TRUE;
-        setDefaultCameraPos();
+        padNoThatPaused = padNo;
+        setDefaultCamera();
         nuAuSeqPlayerSetVol(0,0x1fff);
       }else{
         gamePause = FALSE;
@@ -260,31 +264,65 @@ void readController(int padNo){
         }
       }else{
         // game is paused, and not game over
-        if (contdata[padNo].trigger & U_JPAD){
-          menuSelection--;
-          menuSelection = menuSelection%MAX_MENU_ITEMS;
-          updateMenuArrow();
-        }else if (contdata[padNo].trigger & D_JPAD){
-          menuSelection++;
-          menuSelection = menuSelection%MAX_MENU_ITEMS;
-          updateMenuArrow();
-        }
-        if(contdata[padNo].trigger & A_BUTTON){
-          //pause menu option has been selected
-          switch (menuSelection){
-            case 0 : // continue
-              //this is the same as pressing start
-              gamePause = FALSE;
-              nuAuSeqPlayerSetVol(0,0x3fff);
-              break;
-            case 1 : // quit
-              nuGfxFuncRemove();
-              nuAuSeqPlayerStop(0);
-              stage = 0;
-              break;
+        if(padNo == padNoThatPaused){
+          if (contdata[padNo].trigger & U_JPAD){
+            menuSelection--;
+            menuSelection = menuSelection%MAX_MENU_ITEMS;
+            updateMenuArrow();
+          }else if (contdata[padNo].trigger & D_JPAD){
+            menuSelection++;
+            menuSelection = menuSelection%MAX_MENU_ITEMS;
+            updateMenuArrow();
+          }
+          if(contdata[padNo].trigger & A_BUTTON){
+            btn_down = TRUE;
+          }
+          //selects option when button is released
+          if(!(contdata[padNo].button & A_BUTTON) && btn_down == TRUE){
+            //start button pressed then return to title screen
+            switch (menuSelection){
+              case 0 : // continue
+                //this is the same as pressing start
+                gamePause = FALSE;
+                btn_down = FALSE;
+                nuAuSeqPlayerSetVol(0,0x3fff);
+                break;
+              case 1 : // quit
+                quit();
+                btn_down= FALSE;
+                break;
+            }
           }
         }
       }
+    }
+    //c buttons to move the camera round please
+    if (contdata[padNo].button & U_CBUTTONS)
+      cameraRotation.y -= 0.05;
+      if(cameraRotation.y <= -(M_PI/2)+0.01f){
+        cameraRotation.y = -(M_PI/2)+0.01f;
+      }
+    if (contdata[padNo].button & D_CBUTTONS)
+      cameraRotation.y += 0.05;
+      if(cameraRotation.y >= (M_PI/2)-0.01f){
+        cameraRotation.y = (M_PI/2)-0.01f;
+      }
+    if (contdata[padNo].button & L_CBUTTONS)
+      cameraRotation.x -= 0.05;
+    if (contdata[padNo].button & R_CBUTTONS)
+      cameraRotation.x += 0.05;
+    
+    if(contdata[padNo].button & Z_TRIG ){
+      cameraDistance = cameraDistance+2.0f;
+    }
+    if(contdata[padNo].button & R_TRIG ){
+      cameraDistance = cameraDistance-2.0f;
+    }
+  }else{
+    //game is over
+    if(contdata[padNo].trigger & START_BUTTON){
+      //start button pressed then return to title screen
+      quit();
     }
   }
   // debug
@@ -309,29 +347,12 @@ void readController(int padNo){
     }
   }
 }
+void quit(){
+  nuGfxFuncRemove();
+  nuAuSeqPlayerStop(0);
+  stage = 0;
+}
 void moveCamera(){
-  //c buttons to move the camera round please
-  if (contdata[0].button & U_CBUTTONS)
-    cameraRotation.y -= 0.05;
-    if(cameraRotation.y <= -(M_PI/2)+0.01f){
-      cameraRotation.y = -(M_PI/2)+0.01f;
-    }
-  if (contdata[0].button & D_CBUTTONS)
-    cameraRotation.y += 0.05;
-    if(cameraRotation.y >= (M_PI/2)-0.01f){
-      cameraRotation.y = (M_PI/2)-0.01f;
-    }
-  if (contdata[0].button & L_CBUTTONS)
-    cameraRotation.x -= 0.05;
-  if (contdata[0].button & R_CBUTTONS)
-    cameraRotation.x += 0.05;
-  
-  if(contdata[0].button & Z_TRIG ){
-    cameraDistance = cameraDistance+2.0f;
-  }
-  if(contdata[0].button & R_TRIG ){
-    cameraDistance = cameraDistance-2.0f;
-  }
 	//moving the camera
   cameraTarget.x = 0.0f;
   cameraTarget.y = 0;
@@ -341,13 +362,22 @@ void moveCamera(){
   cameraPos.y = cameraTarget.y + ( cameraDistance * sin(cameraRotation.y)                         );
   cameraPos.z = cameraTarget.z + ( cameraDistance * cos(cameraRotation.x) * cos(cameraRotation.y) );
 }
-void setDefaultCameraPos(){
+void setDefaultCamera(){
   cameraPos.x = 0.0f;
   cameraPos.y = 0.0f;
   cameraPos.z = 0.0f;
   cameraDistance = 7.0f*(squareCount*squareCount) + 195.0f;
   cameraRotation.x = 0.0f;
   cameraRotation.y = 1.0f;
+  cameraRotation.z = 0.0f;
+}
+void setTopDownCamera(){
+  cameraPos.x = 0.0f;
+  cameraPos.y = 0.0f;
+  cameraPos.z = 0.0f;
+  cameraDistance = 7.0f*(squareCount*squareCount) + 195.0f;
+  cameraRotation.x = 0.0f;
+  cameraRotation.y = M_PI/2;
   cameraRotation.z = 0.0f;
 }
 void updateMenuArrow(){
@@ -564,6 +594,7 @@ int isInCurrentCaptureGroup(int x, int y){
 void checkGameOver(){
   if(turnCount >= maxTurns){
     gameOver = TRUE;
+    setTopDownCamera();
     // nuAuSeqPlayerStop(0);
     // nuAuSeqPlayerSetNo(0,0);
     // nuAuSeqPlayerPlay(0);
@@ -806,10 +837,17 @@ void makeDL01() {
       // sprintf(outstring,"- Game Paused -");
       // Draw8Font(114,100,TEX_COL_RED,0);
       sprintf(outstring,"%c Resume", menuArrow[0]);
+      if(btn_down==TRUE && menuSelection == 0){
+      Draw8Font(114,100,TEX_COL_BLACK,0);
+      }else{
       Draw8Font(114,100,TEX_COL_WHITE,0);
-
+      }
       sprintf(outstring,"%c Quit", menuArrow[1]);
+      if(btn_down==TRUE && menuSelection == 1){
+      Draw8Font(114,120,TEX_COL_BLACK,0);
+      }else{
       Draw8Font(114,120,TEX_COL_WHITE,0);
+      }
     }else{
       sprintf(outstring,"White - %d",whiteScore);
       wScoreLoc = 7;
@@ -821,10 +859,16 @@ void makeDL01() {
     }
   }else{
     sprintf(outstring,"Game Over");
-    Draw8Font(114,100, TEX_COL_RED, 0);
+    Draw8Font(130,90, TEX_COL_RED, 0);
 
-    sprintf(outstring,"White - %d vs %d - Black",whiteScore, blackScore);
-    Draw8Font(8*(int)numDigits(whiteScore+blackScore)/2,110, TEX_COL_WHITE, 0);
+    // if(0x30 > (nuScRetraceCounter & 0x30)){
+      // sprintf(outstring,"PRESS START");
+      // Draw8Font(110,130, TEX_COL_BLACK, 0);
+    // }  
+    sprintf(outstring,"%s WINS!", (blackScore > whiteScore) ? "BLACK":"WHITE");
+    Draw8Font(120, 130, TEX_COL_WHITE, 0);
+    // sprintf(outstring,"White - %d vs %d - Black",whiteScore, blackScore);
+    // Draw8Font(8*(int)numDigits(whiteScore+blackScore)/2,110, TEX_COL_WHITE, 0);
   }
   // drawHudGraphic(turnCount);
   
@@ -871,7 +915,7 @@ void makeDL01() {
 
 
     nuDebConTextPos(0,0,3);
-    sprintf(conbuf,"debug:%d, %f, %f",menuSelection, debugX, debugY);
+    sprintf(conbuf,"debug:%d, %f, %f",padNoThatPaused, debugX, debugY);
     nuDebConCPuts(0, conbuf);
     // nuDebConTextPos(0,0,3);
     // sprintf(conbuf,"tempo:%f",boardSize);

@@ -76,20 +76,22 @@ void updateGame00() {
         debugX += 1.0f;
     }else{
       //standard actions
-      if (contdata[0].trigger & START_BUTTON){
-        nuAuSndPlayerPlay(1);
-        transitionStartTime = menuTimer;
-        transition = TRUE;
-      }
-      if (contdata[0].button & A_BUTTON){
-        skyscale+=0.1f;
-      }else if(contdata[0].button & B_BUTTON){
-        skyscale-=0.1f;
-      }
-      if (contdata[0].button & Z_TRIG){
-        scaletwo+=0.1f;
-      }else if(contdata[0].button & R_TRIG){
-        scaletwo-=0.1f;
+      if(transition == FALSE){
+        if (contdata[0].trigger & START_BUTTON){
+          nuAuSndPlayerPlay(1);
+          transitionStartTime = menuTimer;
+          transition = TRUE;
+        }
+        if (contdata[0].button & A_BUTTON){
+          skyscale+=0.1f;
+        }else if(contdata[0].button & B_BUTTON){
+          skyscale-=0.1f;
+        }
+        if (contdata[0].button & Z_TRIG){
+          scaletwo+=0.1f;
+        }else if(contdata[0].button & R_TRIG){
+          scaletwo-=0.1f;
+        }
       }
     }
     
