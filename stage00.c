@@ -97,12 +97,9 @@ void updateGame00() {
     
     //switching debug mode
     if(contdata[0].trigger & L_TRIG){
-      if(debugMode == TRUE){
-        debugMode = FALSE;
-        nuDebConClear(NU_DEB_CON_WINDOW0);
-      }else{
-        debugMode = TRUE;
-      }
+      nuDebConClear(NU_DEB_CON_WINDOW0);
+      //switches from 0 to 1 and vise versa
+      debugMode ^= 1;
     }
 
     if( transition == TRUE ){
@@ -212,10 +209,6 @@ void makeDL00() {
     nuDebConTextPos(0,0,0);
     sprintf(conbuf,"x: %f, y:", screenScale);
     nuDebConCPuts(0, conbuf);
-  }else{
-    // nuDebConTextPos(0,0,0);
-    // sprintf(conbuf," press start ~ %d", debugMode);
-    // nuDebConCPuts(0, conbuf);  
   }
   
   

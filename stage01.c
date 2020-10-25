@@ -12,8 +12,10 @@
 #include "pebble_black.h"
 #include "pebble_white.h"
 #include "cross_by_three.h"
-#include "boardcorners.h"
-#include "boardside.h"
+// #include "boardcorners.h"
+// #include "boardside.h"
+#include "boardedge.h"
+#include "boardsquare.h"
 #include "table.h"
 #include "floor.h"
 #include "decal.h"
@@ -59,7 +61,7 @@ Pebble pebbles[MAX_DROPS];
 int pebbleCount;
 int squareCount;
 boardSquare board[9][9];
-float sqaureSize;
+float squareSize;
 float boardSize;
 /*----------------------*/
 
@@ -139,8 +141,8 @@ void initStage01() {
       board[i][o].isEmpty = TRUE;
     }
   }
-  sqaureSize = 50;
-  boardSize = sqaureSize*squareCount;
+  squareSize = 75.0f; //50.0
+  boardSize = squareSize*(squareCount-1);
 
   for(padNo=0;padNo<MAX_PLAYERS; padNo++){
     //moving values
@@ -149,8 +151,8 @@ void initStage01() {
 
     stickMoveX[padNo] = 0;
     stickMoveY[padNo] = 0;
-    xLocation[padNo] = cursorPos[padNo].x*sqaureSize - (boardSize/2 - sqaureSize/2);
-    zLocation[padNo] = cursorPos[padNo].y*sqaureSize - (boardSize/2 - sqaureSize/2);
+    xLocation[padNo] = cursorPos[padNo].x*squareSize - (boardSize/2); 
+    zLocation[padNo] = cursorPos[padNo].y*squareSize - (boardSize/2); 
     xGoal[padNo] = xLocation[padNo];
     zGoal[padNo] = zLocation[padNo];
     returnedToCenter[padNo] = TRUE;
@@ -327,23 +329,19 @@ void readController(int padNo){
   }
   // debug
   if(contdata[padNo].trigger & L_TRIG){
-    if( debugMode == TRUE){
-      debugMode = FALSE;
-      nuDebConClear(NU_DEB_CON_WINDOW0);
-    }else{
-      debugMode = TRUE;
-    }
+    debugMode ^= 1;
+    nuDebConClear(NU_DEB_CON_WINDOW0);
   }
   if(debugMode == TRUE){
     if(contdata[padNo].trigger & U_JPAD){
-      debugY += 1.0f;
+      debugY += 5.0f;
     }else if( contdata[padNo].trigger & D_JPAD){
-      debugY -= 1.0f;
+      debugY -= 5.0f;
     }
     if(contdata[padNo].trigger & R_JPAD){
-      debugX += 1.0f;
+      debugX += 5.0f;
     }else if( contdata[padNo].trigger & L_JPAD){
-      debugX -= 1.0f;
+      debugX -= 5.0f;
     }
   }
 }
@@ -444,8 +442,8 @@ void moveCursor(int padNo, int xDelta, int yDelta){
 			// }		
 		}
 		
-    xGoal[padNo] = cursorPos[padNo].x*sqaureSize - (boardSize/2 - sqaureSize/2);
-    zGoal[padNo] = cursorPos[padNo].y*sqaureSize - (boardSize/2 - sqaureSize/2);
+    xGoal[padNo] = cursorPos[padNo].x*squareSize - (boardSize/2);
+    zGoal[padNo] = cursorPos[padNo].y*squareSize - (boardSize/2); 
     // lower this is the faster the pebble cursor will move
     moveSpeedSteps[padNo] = 5;
     stickResetFromTimer[padNo] = timer - 1; // -1 to stop it resetting the count immediately
@@ -453,7 +451,7 @@ void moveCursor(int padNo, int xDelta, int yDelta){
 void removePebble(int x, int y){
   if(board[x][y].isEmpty == FALSE){
     board[x][y].isEmpty = TRUE;
-    startPebbleRemove(board[x][y].content);
+    movePebbleToDiscardPot(board[x][y].content);
     if((*board[x][y].content).colour == WHITE){
       blackScore++;
     }else{
@@ -462,7 +460,7 @@ void removePebble(int x, int y){
     board[x][y].content = NULL;
   }
 }
-void startPebbleRemove(Pebble *pebble){
+void movePebbleToDiscardPot(Pebble *pebble){
   if((*pebble).colour == WHITE){
     // move captured white pebbles to the pile
     (*pebble).position.x = whitePotLocation.x;
@@ -663,88 +661,96 @@ void makeDL01() {
   );
 	gSPSetLights0(displayListPtr++, my_ambient_only_light);
 	gSPSetLights1(displayListPtr++, sun_light);
+
+  //sets the background to white
+  gDPSetCycleType(displayListPtr++, G_CYC_FILL);
+  gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
+  gDPSetFillColor(displayListPtr++, GPACK_RGBA5551(255, 255, 255, 1));
+  gDPFillRectangle(displayListPtr++, 0, 0, SCREEN_WD-1, SCREEN_HT-1);
+  gDPNoOp(displayListPtr++);
+  gDPPipeSync(displayListPtr++);
+
   {
-		CURRENT_GFX = -1;
-    /* the pebble that hovers above the cursor */
-		for(padNo=0;padNo<MAX_PLAYERS;padNo++){
-      if(nuContStatus[padNo].errno != 0){
-		  continue;
-	    }
-      CURRENT_GFX++;
-      guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer*2%360, 0.0f, 0.6f, xLocation[padNo], (turnCount % 2 == padNo) ? 40 + 20*sin((float)timer/30.0f+padNo*2) : 30, zLocation[padNo]);
-      gSPMatrix(displayListPtr++,
-        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-        G_MTX_PUSH | // ...push another matrix onto the stack...
-        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-      );
-      if(padNo%2==0){
-        drawModel(Wtx_pebble_black);
-      }else{
-        drawModel(Wtx_pebble_white);
-      }
-      
-      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-      
-      CURRENT_GFX++;
-      guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 1.0f, zGoal[padNo]);
-      gSPMatrix(displayListPtr++,
-          OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-          G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-          G_MTX_PUSH | // ...push another matrix onto the stack...
-          G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-        );
-      drawSquare();
-      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-    }	
-		
-
-    
-    for(i=0;i<(int)squareCount/3; ++i){   
-      for(o=0;o<(int)squareCount/3; ++o){ 
+    if(gameOver== FALSE){
+      CURRENT_GFX = -1;
+      /* the pebble that hovers above the cursor */
+      for(padNo=0;padNo<MAX_PLAYERS;padNo++){
+        if(nuContStatus[padNo].errno != 0){
+        continue;
+        }
         CURRENT_GFX++;
-        guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
-        0.0f, //angle it to be flat
-        0.0f, 0.0f, 
-        (2.5f), //scale based on square size
-        i * sqaureSize*3 - boardSize/2.0f + sqaureSize*3/2.0f,  //x
-        0.0f,//y move down
-        o * sqaureSize*3 - boardSize/2.0f + sqaureSize*3/2.0f); //z
-
+        guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer*2%360, 0.0f, 0.6f, xLocation[padNo], (turnCount % 2 == padNo) ? 40 + 20*sin((float)timer/30.0f+padNo*2) : 30, zLocation[padNo]);
         gSPMatrix(displayListPtr++,
           OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
           G_MTX_MODELVIEW | // operating on the modelview matrix stack...
           G_MTX_PUSH | // ...push another matrix onto the stack...
           G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
         );
-        drawModel(Wtx_cross_by_three);
+        if(padNo%2==0){
+          drawModel(Wtx_pebble_black);
+        }else{
+          drawModel(Wtx_pebble_white);
+        }
+        
         gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-      }
-    }
+        
+        CURRENT_GFX++;
+        guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 1.0f, zGoal[padNo]);
+        gSPMatrix(displayListPtr++,
+            OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+            G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+            G_MTX_PUSH | // ...push another matrix onto the stack...
+            G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+          );
+        drawSquare();
+        gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+      }	
+		
 
-    CURRENT_GFX++;
-    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
-    0.0f, //angle it to be flat
-    0.0f, 0.0f, 
-    2.5f, //scale based on square size
-    -150.0f,  //x
-    0.0f,//y move down
-    -150.0f); //z
+    
+    // for(i=0;i<(squareCount-1)/2; ++i){   
+    //   for(o=0;o<(squareCount-1)/2; ++o){ 
+    //     CURRENT_GFX++;
+    //     guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+    //     0.0f, //angle it to be flat
+    //     0.0f, 0.0f, 
+    //     (2.5f), //scale based on square size
+    //     i * squareSize*2.0f - boardSize/2.0f + squareSize,  //x, the *2 is the same as the /2 in the for loop
+    //     0.0f,//y move down
+    //     o * squareSize*2.0f - boardSize/2.0f + squareSize); //z
 
-    gSPMatrix(displayListPtr++,
-      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-      G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-      G_MTX_PUSH | // ...push another matrix onto the stack...
-      G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-    );
-    drawModel(Wtx_boardcorners);
-    gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-
-    for(i=0;i<4;i++){
+    //     gSPMatrix(displayListPtr++,
+    //       OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+    //       G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+    //       G_MTX_PUSH | // ...push another matrix onto the stack...
+    //       G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+    //     );
+    //     drawModel(Wtx_boardsquare);
+    //     gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    //   }
+    // }
       CURRENT_GFX++;
       guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
       0.0f, //angle it to be flat
-      i*90.0f, 0.0f, 
+      0.0f, 0.0f, 
+      (2.5f*4), //scale based on square size
+      0.0f,  //x, the *2 is the same as the /2 in the for loop
+      0.0f,//y move down
+      0.0f); //z
+
+      gSPMatrix(displayListPtr++,
+        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+        G_MTX_PUSH | // ...push another matrix onto the stack...
+        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+      );
+      drawModel(Wtx_boardsquare);
+      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+
+      CURRENT_GFX++;
+      guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+      0.0f, //angle it to be flat
+      0.0f, 0.0f, 
       2.5f, //scale based on square size
       0.0f,  //x
       0.0f,//y move down
@@ -756,33 +762,35 @@ void makeDL01() {
         G_MTX_PUSH | // ...push another matrix onto the stack...
         G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
       );
-      if(i < 2){
-        drawModel(Wtx_boardside);
-      }else{
-        drawModel(Wtx_boardside_mirror);
-      }
+      drawModel(Wtx_boardedge);
       gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-    }
 
-    CURRENT_GFX++;
-    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
-    0.0f, //angle it to be flat
-    0.0f, 0.0f, 
-    2.5f, //scale based on square size
-    0.0f,  //x
-    0.0f,//y move down
-    0.0f); //z
+    // for(i=0;i<4;i++){
+    //   CURRENT_GFX++;
+    //   guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+    //   0.0f, //angle it to be flat
+    //   i*90.0f, 0.0f, 
+    //   2.5f, //scale based on square size
+    //   0.0f,  //x
+    //   0.0f,//y move down
+    //   0.0f); //z
 
-    gSPMatrix(displayListPtr++,
-      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-      G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-      G_MTX_PUSH | // ...push another matrix onto the stack...
-      G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-    );
-    drawModel(Wtx_floor);
-    gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    //   gSPMatrix(displayListPtr++,
+    //     OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+    //     G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+    //     G_MTX_PUSH | // ...push another matrix onto the stack...
+    //     G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+    //   );
+    //   if(i < 2){
+    //     drawModel(Wtx_boardside);
+    //   }else{
+    //     drawModel(Wtx_boardside_mirror);
+    //   }
+    //   gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    // }
 
-    // drawModelInPosition(gfxTask, Wtx_table, 
+    // CURRENT_GFX++;
+    // guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
     // 0.0f, //angle it to be flat
     // 0.0f, 0.0f, 
     // 2.5f, //scale based on square size
@@ -790,45 +798,57 @@ void makeDL01() {
     // 0.0f,//y move down
     // 0.0f); //z
 
-    CURRENT_GFX++;
-    guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
-    0.0f, //angle it to be flat
-    0.0f, 0.0f, 
-    2.5f, //scale based on square size
-    0.0f,  //x
-    0.0f,//y move down
-    0.0f); //z
+    // gSPMatrix(displayListPtr++,
+    //   OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+    //   G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+    //   G_MTX_PUSH | // ...push another matrix onto the stack...
+    //   G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+    // );
+    // drawModel(Wtx_floor);
+    // gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+// 
+    // 
+// 
+    // CURRENT_GFX++;
+    // guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+    // 0.0f, //angle it to be flat
+    // 0.0f, 0.0f, 
+    // 2.5f, //scale based on square size
+    // 0.0f,  //x
+    // 0.0f,//y move down
+    // 0.0f); //z
 
-    gSPMatrix(displayListPtr++,
-      OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-      G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-      G_MTX_PUSH | // ...push another matrix onto the stack...
-      G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-    );
-    drawModel(Wtx_table);
-    gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    // gSPMatrix(displayListPtr++,
+    //   OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+    //   G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+    //   G_MTX_PUSH | // ...push another matrix onto the stack...
+    //   G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+    // );
+    // drawModel(Wtx_table);
+    // gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+   
+      for(i=0;i<pebbleCount; ++i){
 
-    for(i=0;i<pebbleCount; ++i){
+        CURRENT_GFX++;
 
-      CURRENT_GFX++;
+        // guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer + -(pebbles[i].rotation*(180/M_PI)) ,0.0f,1.0f, pebbles[i].position.x, 50 + 30*sin(pebbles[i].position.y +(float)timer/30.0f), pebbles[i].position.z);
+        guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, pebbles[i].rotation ,0.0f,0.8f, pebbles[i].position.x, pebbles[i].position.y, pebbles[i].position.z);
 
-      // guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer + -(pebbles[i].rotation*(180/M_PI)) ,0.0f,1.0f, pebbles[i].position.x, 50 + 30*sin(pebbles[i].position.y +(float)timer/30.0f), pebbles[i].position.z);
-      guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, pebbles[i].rotation ,0.0f,0.8f, pebbles[i].position.x, pebbles[i].position.y, pebbles[i].position.z);
+        gSPMatrix(displayListPtr++,
+          OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+          G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+          G_MTX_PUSH | // ...push another matrix onto the stack...
+          G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+        );
+        if(pebbles[i].colour == WHITE){
+          drawModel(Wtx_pebble_white);
+        }else{
+          drawModel(Wtx_pebble_black);
+        }
+        gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
 
-      gSPMatrix(displayListPtr++,
-        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-        G_MTX_PUSH | // ...push another matrix onto the stack...
-        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-      );
-			if(pebbles[i].colour == WHITE){
-      	drawModel(Wtx_pebble_white);
-			}else{
-				drawModel(Wtx_pebble_black);
-			}
-      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-
-      
+        
+      }
     }
   }
 
@@ -862,8 +882,8 @@ void makeDL01() {
     Draw8Font(130,90, TEX_COL_RED, 0);
 
     // if(0x30 > (nuScRetraceCounter & 0x30)){
-      // sprintf(outstring,"PRESS START");
-      // Draw8Font(110,130, TEX_COL_BLACK, 0);
+    //   sprintf(outstring,"PR");
+    //   Draw8Font(110,110, TEX_COL_BLACK, 0);
     // }  
     sprintf(outstring,"%s WINS!", (blackScore > whiteScore) ? "BLACK":"WHITE");
     Draw8Font(120, 130, TEX_COL_WHITE, 0);
