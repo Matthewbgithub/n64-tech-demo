@@ -16,6 +16,7 @@
 // #include "boardside.h"
 #include "boardsquarealt.h"
 #include "boardedge.h"
+#include "selectionRing.h"
 // #include "boardsquare.h"
 #include "table.h"
 #include "floor.h"
@@ -681,41 +682,7 @@ void makeDL01() {
   {
     if(gameOver== FALSE){
       CURRENT_GFX = -1;
-      /* the pebble that hovers above the cursor */
-      for(padNo=0;padNo<MAX_PLAYERS;padNo++){
-        if(nuContStatus[padNo].errno != 0){
-        continue;
-        }
-        CURRENT_GFX++;
-        guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer*2%360, 0.0f, 0.6f, xLocation[padNo], (turnCount % 2 == padNo) ? 40 + 20*sin((float)timer/30.0f+padNo*2) : 30, zLocation[padNo]);
-        gSPMatrix(displayListPtr++,
-          OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-          G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-          G_MTX_PUSH | // ...push another matrix onto the stack...
-          G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-        );
-        
-        if(padNo%2==0){
-          drawModel(Wtx_pebble_black);
-        }else{
-          drawModel(Wtx_pebble_white);
-        }
-        gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-        
-        if(turnCount%2 == padNo){
-          //dont display the square if not that players turn
-          CURRENT_GFX++;
-          guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 1.0f, zGoal[padNo]);
-          gSPMatrix(displayListPtr++,
-              OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-              G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-              G_MTX_PUSH | // ...push another matrix onto the stack...
-              G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-            );
-          drawSquare();
-          gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-        }
-      }	
+      
 		
 
     
@@ -866,6 +833,42 @@ void makeDL01() {
 
         
       }
+
+      /* the pebble that hovers above the cursor */
+      for(padNo=0;padNo<MAX_PLAYERS;padNo++){
+        if(nuContStatus[padNo].errno != 0){
+        continue;
+        }
+        CURRENT_GFX++;
+        guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer*2%360, 0.0f, 0.6f, xLocation[padNo], (turnCount % 2 == padNo) ? 40 + 20*sin((float)timer/30.0f+padNo*2) : 30, zLocation[padNo]);
+        gSPMatrix(displayListPtr++,
+          OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+          G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+          G_MTX_PUSH | // ...push another matrix onto the stack...
+          G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+        );
+        
+        if(padNo%2==0){
+          drawSmoothModel(Wtx_pebble_black);
+        }else{
+          drawSmoothModel(Wtx_pebble_white);
+        }
+        gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+        
+        if(turnCount%2 == padNo){
+          //dont display the square if not that players turn
+          CURRENT_GFX++;
+          guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 0.0f, zGoal[padNo]);
+          gSPMatrix(displayListPtr++,
+              OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+              G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+              G_MTX_PUSH | // ...push another matrix onto the stack...
+              G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+            );
+          drawTransModel(Wtx_selectionring);
+          gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+        }
+      }	
       drawBanner();
     }
   }
@@ -1049,6 +1052,25 @@ void drawModel(modelName){
   gSPDisplayList(displayListPtr++, modelName);
   gDPPipeSync(displayListPtr++);
 }
+void drawTransModel(modelName){
+  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+  gDPSetTextureFilter(displayListPtr++, G_TF_AVERAGE);
+  gDPSetRenderMode(displayListPtr++,G_RM_AA_ZB_XLU_DECAL, G_RM_AA_ZB_XLU_DECAL2);
+  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
+  gSPDisplayList(displayListPtr++, modelName);
+  gDPPipeSync(displayListPtr++);
+}
+void drawSmoothModel(modelName){
+  gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
+  gDPSetTextureFilter(displayListPtr++, G_TF_BILERP);
+  gDPSetRenderMode(displayListPtr++, G_RM_AA_ZB_OPA_SURF, G_RM_AA_ZB_OPA_SURF2);
+  gSPClearGeometryMode(displayListPtr++,0xFFFFFFFF);
+  gSPSetGeometryMode(displayListPtr++, G_SHADE | G_SHADING_SMOOTH | G_ZBUFFER | G_LIGHTING);
+  gSPDisplayList(displayListPtr++, modelName);
+  gDPPipeSync(displayListPtr++);
+}
+
 // void drawModelInPosition(GraphicsTask *gft, void (*modelName), float roll, float pitch, float yaw, float scale, float transx, float transy, float transz){
 //     CURRENT_GFX++;
 //     guPosition(&gft->objectTransforms[CURRENT_GFX],
