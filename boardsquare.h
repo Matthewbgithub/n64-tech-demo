@@ -84,7 +84,7 @@ Gfx Vtx_boardsquare_mesh01_dl[] __attribute__((aligned (16))) = {
 };
 
 Gfx Wtx_boardsquare[] __attribute__((aligned (16))) = {
-	gsSPTexture(0x8000, 0x8000, 0, G_TX_RENDERTILE, G_ON),
+	gsSPTexture(0x8000 << 8, 0x8000 << 8, 0, G_TX_RENDERTILE, G_ON),
 	gsDPSetCombineMode(G_CC_MODULATERGBDECALA, G_CC_MODULATERGBDECALA),
 	gsDPLoadTextureBlock(Text_boardsquare_square_diff, G_IM_FMT_RGBA, G_IM_SIZ_16b,32,32,0, 
 		  G_TX_WRAP|G_TX_MIRROR, G_TX_WRAP|G_TX_MIRROR,5,5, G_TX_NOLOD, G_TX_NOLOD), 

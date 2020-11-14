@@ -14,8 +14,9 @@
 #include "cross_by_three.h"
 // #include "boardcorners.h"
 // #include "boardside.h"
+#include "boardsquarealt.h"
 #include "boardedge.h"
-#include "boardsquare.h"
+// #include "boardsquare.h"
 #include "table.h"
 #include "floor.h"
 #include "decal.h"
@@ -103,6 +104,9 @@ int timer;
 int padNo;
 int btn_down;
 int padNoThatPaused;
+int bannerHeight = (int)(SCREEN_HT/12)-1;
+u32     screenWhite = GPACK_RGBA5551(255, 255, 255, 1);
+u32     screenBlack = GPACK_RGBA5551(0, 0, 0, 1);
 
 //controller variables
 float stickMoveX[MAX_PLAYERS];
@@ -173,7 +177,7 @@ void initStage01() {
 	turnCount = 0;
   blackScore = 0;
   whiteScore = 0;
-  maxTurns = 3;
+  maxTurns = 10;
   gameOver = FALSE;  
   gamePause = FALSE;
   btn_down = FALSE;
@@ -364,7 +368,7 @@ void setDefaultCamera(){
   cameraPos.x = 0.0f;
   cameraPos.y = 0.0f;
   cameraPos.z = 0.0f;
-  cameraDistance = 7.0f*(squareCount*squareCount) + 195.0f;
+  cameraDistance = 7.0f*(squareCount*squareCount) + 200.0f;
   cameraRotation.x = 0.0f;
   cameraRotation.y = 1.0f;
   cameraRotation.z = 0.0f;
@@ -373,7 +377,7 @@ void setTopDownCamera(){
   cameraPos.x = 0.0f;
   cameraPos.y = 0.0f;
   cameraPos.z = 0.0f;
-  cameraDistance = 7.0f*(squareCount*squareCount) + 195.0f;
+  cameraDistance = 7.0f*(squareCount*squareCount) + 200.0f;
   cameraRotation.x = 0.0f;
   cameraRotation.y = M_PI/2;
   cameraRotation.z = 0.0f;
@@ -665,7 +669,11 @@ void makeDL01() {
   //sets the background to white
   gDPSetCycleType(displayListPtr++, G_CYC_FILL);
   gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
-  gDPSetFillColor(displayListPtr++, GPACK_RGBA5551(255, 255, 255, 1));
+  if(gameOver == FALSE){
+    gDPSetFillColor(displayListPtr++, GPACK_RGBA5551(255, 255, 255, 1));
+  }else{
+    gDPSetFillColor(displayListPtr++, GPACK_RGBA5551(128, 128, 128, 1));
+  }
   gDPFillRectangle(displayListPtr++, 0, 0, SCREEN_WD-1, SCREEN_HT-1);
   gDPNoOp(displayListPtr++);
   gDPPipeSync(displayListPtr++);
@@ -686,24 +694,27 @@ void makeDL01() {
           G_MTX_PUSH | // ...push another matrix onto the stack...
           G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
         );
+        
         if(padNo%2==0){
           drawModel(Wtx_pebble_black);
         }else{
           drawModel(Wtx_pebble_white);
         }
-        
         gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
         
-        CURRENT_GFX++;
-        guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 1.0f, zGoal[padNo]);
-        gSPMatrix(displayListPtr++,
-            OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-            G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-            G_MTX_PUSH | // ...push another matrix onto the stack...
-            G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-          );
-        drawSquare();
-        gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+        if(turnCount%2 == padNo){
+          //dont display the square if not that players turn
+          CURRENT_GFX++;
+          guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 1.0f, zGoal[padNo]);
+          gSPMatrix(displayListPtr++,
+              OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+              G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+              G_MTX_PUSH | // ...push another matrix onto the stack...
+              G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+            );
+          drawSquare();
+          gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+        }
       }	
 		
 
@@ -729,23 +740,29 @@ void makeDL01() {
     //     gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
     //   }
     // }
-      CURRENT_GFX++;
-      guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
-      0.0f, //angle it to be flat
-      0.0f, 0.0f, 
-      (2.5f*4), //scale based on square size
-      0.0f,  //x, the *2 is the same as the /2 in the for loop
-      0.0f,//y move down
-      0.0f); //z
 
-      gSPMatrix(displayListPtr++,
-        OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-        G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-        G_MTX_PUSH | // ...push another matrix onto the stack...
-        G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-      );
-      drawModel(Wtx_boardsquare);
-      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    // for(i=0;i<2; ++i){   
+    //   for(o=0;o<2; ++o){ 
+        CURRENT_GFX++;
+        guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
+        0.0f, //angle it to be flat
+        0.0f, 0.0f, 
+        (2.5f), //scale based on square size
+        0.0f,  //x, the *2 is the same as the /2 in the for loop
+        0.0f,//y move down
+        0.0f); //z
+
+        gSPMatrix(displayListPtr++,
+          OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+          G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+          G_MTX_PUSH | // ...push another matrix onto the stack...
+          G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+        );
+        drawModel(Wtx_boardsquarealt);
+        gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+    //   }
+    // }
+      
 
       CURRENT_GFX++;
       guPosition(&gfxTask->objectTransforms[CURRENT_GFX],
@@ -849,6 +866,7 @@ void makeDL01() {
 
         
       }
+      drawBanner();
     }
   }
 
@@ -871,7 +889,7 @@ void makeDL01() {
     }else{
       sprintf(outstring,"White - %d",whiteScore);
       wScoreLoc = 7;
-      Draw8Font(wScoreLoc,5, TEX_COL_WHITE, 0);
+      Draw8Font(wScoreLoc,5, TEX_COL_BLACK, 0);
 
       sprintf(outstring,"%d - Black",blackScore);
       bScoreLoc = 252 - 8 * numDigits(blackScore); 
@@ -1050,43 +1068,36 @@ void drawModel(modelName){
 //     drawModel(*modelName);
 //     gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
 // }
-void drawHudGraphic(int turn){
-  if(turn % 2 == 0){
-    // gDPSetCycleType(displayListPtr++, G_CYC_1CYCLE);
-    // gDPSetTextureFilter(displayListPtr++, G_TF_POINT);
-    // gDPSetRenderMode(displayListPtr++, G_RM_TEX_EDGE, G_RM_TEX_EDGE);
-    
-    // gSPTexture(displayListPtr++, 0xffff, 0xffff, 0, G_TX_RENDERTILE, G_ON);
-    // gDPSetCombineMode(displayListPtr++, G_CC_DECALRGBA, G_CC_DECALRGBA);
-    // gDPSetTexturePersp(displayListPtr++, G_TP_NONE);
-    // gDPLoadTextureTile(displayListPtr++,
-    //   decal,
-    //   G_IM_FMT_YUV,
-    //   G_IM_SIZ_8b,
-    //   32, 32,
-    //   0,0,32,32,
-    //   0,
-    //   G_TX_NOMIRROR,G_TX_NOMIRROR,
-    //   G_TX_NOMASK, G_TX_NOMASK,
-    //   G_TX_NOLOD, G_TX_NOLOD
-    // );
-    // gSPTextureRectangle(displayListPtr++,
-    //   0,0,32,32,
-    //   G_TX_RENDERTILE,
-    //   (0 << 2),
-    //   (0 << 2),
-    //   (int)(1 << 5),
-    //   (int)(1 << 5)
-    // );
-    // gDPPipeSync(displayListPtr++);
-    // gDPPipeSync(displayListPtr++);
-    
-    sprintf(outtwo,"nooooi");
-    drawTex(10,10, TEX_COL_WHITE, 0);
-  }else{
-    sprintf(outtwo,"noooo");
-    drawTex(10,10, TEX_COL_WHITE, 0);
-  }
+//sets the background to white
+void drawBanner(){
+  //displays banner where the scores go
+  gDPSetCycleType(displayListPtr++, G_CYC_FILL);
+  gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
+  gDPSetFillColor(displayListPtr++, screenWhite);
+  gDPFillRectangle(displayListPtr++, 0, 0, (int)(SCREEN_WD/3)-1, bannerHeight);
+  gDPNoOp(displayListPtr++);
+  gDPPipeSync(displayListPtr++);
+
+  gDPSetCycleType(displayListPtr++, G_CYC_FILL);
+  gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
+  gDPSetFillColor(displayListPtr++, (turnCount%2==0) ? screenBlack : screenWhite);
+  gDPFillRectangle(displayListPtr++, (int)(SCREEN_WD/3)-1, 0, (int)(SCREEN_WD/3)*2-1, bannerHeight);
+  gDPNoOp(displayListPtr++);
+  gDPPipeSync(displayListPtr++);
+
+  gDPSetCycleType(displayListPtr++, G_CYC_FILL);
+  gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
+  gDPSetFillColor(displayListPtr++, screenBlack);
+  gDPFillRectangle(displayListPtr++, (int)(SCREEN_WD/3)*2-1, 0, SCREEN_WD-1, bannerHeight);
+  gDPNoOp(displayListPtr++);
+  gDPPipeSync(displayListPtr++);
+
+  gDPSetCycleType(displayListPtr++, G_CYC_FILL);
+  gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
+  gDPSetFillColor(displayListPtr++, screenBlack);
+  gDPFillRectangle(displayListPtr++, 0, bannerHeight, SCREEN_WD-1, 20);
+  gDPNoOp(displayListPtr++);
+  gDPPipeSync(displayListPtr++);
 }
 int numDigits(int n){
   if( n < 10 ) return 1;
