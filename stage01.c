@@ -237,7 +237,7 @@ void updateGame01() {
 void takeTurn(int padNo){
     // osSyncPrintf("Turn taken from player %d", padNo);
     placeCounter(padNo);
-    checkForCaptures();
+    checkForCaptures(padNo);
     checkGameOver();
 }
 void readController(int padNo){
@@ -339,14 +339,14 @@ void readController(int padNo){
   }
   if(debugMode == TRUE){
     if(contdata[padNo].trigger & U_JPAD){
-      debugY += 5.0f;
+      debugY += 1.0f;
     }else if( contdata[padNo].trigger & D_JPAD){
-      debugY -= 5.0f;
+      debugY -= 1.0f;
     }
     if(contdata[padNo].trigger & R_JPAD){
-      debugX += 5.0f;
+      debugX += 1.0f;
     }else if( contdata[padNo].trigger & L_JPAD){
-      debugX -= 5.0f;
+      debugX -= 1.0f;
     }
   }
 }
@@ -479,6 +479,12 @@ void movePebbleToDiscardPot(Pebble *pebble){
     (*pebble).position.z = blackPotLocation.y;
   }
 }
+void undoPebblePlace(padNo){
+  board[cursorPos[padNo].x][cursorPos[padNo].y].content = NULL;
+  board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty = TRUE;
+  pebbleCount--;
+  turnCount--;
+}
 void placeCounter(int padNo) {
 	if(board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty == TRUE){
 		if( pebbleCount <= MAX_DROPS ){
@@ -511,7 +517,9 @@ void placeCounter(int padNo) {
 			}
 		}
 	}else{
-		nuAuSndPlayerPlay(1);
+    // cant place piece because board place is occupied
+    // BONG noise
+		nuAuSndPlayerPlay((int)debugX);
 	}
 }
 int isOffBoard(int x, int y){
@@ -527,7 +535,11 @@ void resetCaptureGroup(){
   //   pebblesInCurrentCaptureGroup[i] = NULL;
   // }
 }
-void checkForCaptures(){
+
+// returning 0 means self capture avoided
+// returning 1 means capture occured
+// returning 2 means nothing happened
+int checkForCaptures(int padNo){
   for(i=0;i<squareCount; ++i){   
     for(o=0;o<squareCount; ++o){
       if(board[i][o].isEmpty == FALSE){
@@ -547,14 +559,27 @@ void checkForCaptures(){
         // if the checks never reached an empty space then capture the pieces
         if(currentCaptureGroupReachedEmpty == FALSE){
           // osSyncPrintf("-------The capture group found an enclosed section!-----\n");
-          // capture pieces
-          for(k=0;k<currentCaptureGroupIndex;++k){
-            removePebble(pebblesInCurrentCaptureGroup[k].x,pebblesInCurrentCaptureGroup[k].y);
-          } 
+          // before capturing the pieces we need to check if its a self capture
+          if(currentCaptureGroupColour == (*board[cursorPos[padNo].x][cursorPos[padNo].y].content).colour){
+            // is a self capture, so capture will not take place, and pebble will be 'un placed'
+            undoPebblePlace(padNo);
+            // BONG noise
+            nuAuSndPlayerPlay(1);
+            return 0;
+          }else{
+            // capture pieces
+            for(k=0;k<currentCaptureGroupIndex;++k){
+              removePebble(pebblesInCurrentCaptureGroup[k].x,pebblesInCurrentCaptureGroup[k].y);
+            } 
+            //pling noise
+            nuAuSndPlayerPlay(6);
+            return 1;
+          }
         }
       }
     }
   }
+  return 2;
 }
 void startCheckingFromHere(int x, int y){
   // osSyncPrintf("expanding checking from %d,%d\n",x,y);
