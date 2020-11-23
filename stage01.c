@@ -78,11 +78,13 @@ int blackScore;
 int whiteScore;
 int bScoreLoc;
 int wScoreLoc;
-const Vec2d whitePotLocation = {300.0f,0.0f};
-const Vec2d blackPotLocation = {-300.0f,0.0f};
+const Vec2d whitePotLocation = {425.0f,0.0f};
+const Vec2d blackPotLocation = {-425.0f,0.0f};
 int maxTurns;
-int gameOver;
-int gamePause;
+int gameOver; // BOOL
+int gamePause; // BOOL
+int lastTurnWasSkipped; // BOOL
+int thisTurnWasSkipped; // BOOL
 char menuArrow[MAX_MENU_ITEMS];
 unsigned int menuSelection; // unsigned because the menu item array is only positive numbers
 /*---------------------------*/
@@ -108,6 +110,7 @@ int padNoThatPaused;
 int bannerHeight = (int)(SCREEN_HT/12)-1;
 u32     screenWhite = GPACK_RGBA5551(255, 255, 255, 1);
 u32     screenBlack = GPACK_RGBA5551(0, 0, 0, 1);
+u32     screenRed =   GPACK_RGBA5551(255,0,0, 1);
 
 //controller variables
 float stickMoveX[MAX_PLAYERS];
@@ -263,11 +266,14 @@ void readController(int padNo){
     } else {
       if( gamePause == FALSE){
         //game is not paused, and not game over'd
-        if (contdata[padNo].trigger & A_BUTTON){
+        if( turnCount % 2 == padNo){
           // stops players placing a piece out of turn
-          if( turnCount % 2 == padNo){
+          if (contdata[padNo].trigger & A_BUTTON){
             takeTurn(padNo);
+          }else if( contdata[padNo].trigger & B_BUTTON){
+            passTurn();
           }
+
         }
       }else{
         // game is paused, and not game over
@@ -369,7 +375,7 @@ void setDefaultCamera(){
   cameraPos.x = 0.0f;
   cameraPos.y = 0.0f;
   cameraPos.z = 0.0f;
-  cameraDistance = 7.0f*(squareCount*squareCount) + 200.0f;
+  cameraDistance = 7.0f*(squareCount*squareCount) + 250.0f;
   cameraRotation.x = 0.0f;
   cameraRotation.y = 1.0f;
   cameraRotation.z = 0.0f;
@@ -484,6 +490,13 @@ void undoPebblePlace(padNo){
   board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty = TRUE;
   pebbleCount--;
   turnCount--;
+  thisTurnWasSkipped = FALSE;
+}
+void passTurn(){
+  lastTurnWasSkipped = thisTurnWasSkipped;
+  thisTurnWasSkipped = TRUE;
+  turnCount++;
+  checkGameOver();
 }
 void placeCounter(int padNo) {
 	if(board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty == TRUE){
@@ -512,6 +525,8 @@ void placeCounter(int padNo) {
           board[cursorPos[padNo].x][cursorPos[padNo].y].content = &pebbles[i];
           board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty = FALSE;
           turnCount++;
+          lastTurnWasSkipped = FALSE;
+          thisTurnWasSkipped = FALSE;
 					break;
 				}
 			}
@@ -620,7 +635,7 @@ int isInCurrentCaptureGroup(int x, int y){
   return FALSE;
 }
 void checkGameOver(){
-  if(turnCount >= maxTurns){
+  if(turnCount >= maxTurns || (lastTurnWasSkipped == TRUE && thisTurnWasSkipped == TRUE)){
     gameOver = TRUE;
     setTopDownCamera();
     // nuAuSeqPlayerStop(0);
@@ -672,6 +687,7 @@ void makeDL01() {
   // load the projection matrix into the matrix stack.
   // given the combination of G_MTX_flags we provide, effectively this means
   // "replace the projection matrix with this new matrix"
+
   gSPMatrix(
     displayListPtr++,
     // we use the OS_K0_TO_PHYSICAL macro to convert the pointer to this matrix
@@ -683,6 +699,10 @@ void makeDL01() {
     G_MTX_LOAD | // don't multiply matrix by previously-top matrix in stack
     G_MTX_NOPUSH // don't push another matrix onto the stack before operation
   );
+
+  
+
+
 
   gSPMatrix(displayListPtr++,
     OS_K0_TO_PHYSICAL(&(gfxTask->modelview)),
@@ -696,7 +716,7 @@ void makeDL01() {
   gDPSetCycleType(displayListPtr++, G_CYC_FILL);
   gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
   if(gameOver == FALSE){
-    gDPSetFillColor(displayListPtr++, GPACK_RGBA5551(255, 255, 255, 1));
+    gDPSetFillColor(displayListPtr++, screenWhite);
   }else{
     gDPSetFillColor(displayListPtr++, GPACK_RGBA5551(128, 128, 128, 1));
   }
@@ -708,7 +728,16 @@ void makeDL01() {
     if(gameOver== FALSE){
       CURRENT_GFX = -1;
       
-		
+      CURRENT_GFX++;
+      guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, debugX, 50.0f, debugY);
+      gSPMatrix(displayListPtr++,
+          OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+          G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+          G_MTX_PUSH | // ...push another matrix onto the stack...
+          G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+        );
+      drawTransModel(Wtx_selectionring);
+      gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
 
     
     // for(i=0;i<(squareCount-1)/2; ++i){   
@@ -981,7 +1010,7 @@ void makeDL01() {
 
 
     nuDebConTextPos(0,0,3);
-    sprintf(conbuf,"debug:%d, %f, %f",padNoThatPaused, debugX, debugY);
+    sprintf(conbuf,"debug:%f, %f",debugX, debugY);
     nuDebConCPuts(0, conbuf);
     // nuDebConTextPos(0,0,3);
     // sprintf(conbuf,"tempo:%f",boardSize);
@@ -1118,6 +1147,8 @@ void drawSmoothModel(modelName){
 //sets the background to white
 void drawBanner(){
   //displays banner where the scores go
+
+  //white behind left 3rd
   gDPSetCycleType(displayListPtr++, G_CYC_FILL);
   gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
   gDPSetFillColor(displayListPtr++, screenWhite);
@@ -1125,13 +1156,19 @@ void drawBanner(){
   gDPNoOp(displayListPtr++);
   gDPPipeSync(displayListPtr++);
 
+  // middle 3rd
   gDPSetCycleType(displayListPtr++, G_CYC_FILL);
   gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
-  gDPSetFillColor(displayListPtr++, (turnCount%2==0) ? screenBlack : screenWhite);
+  if(thisTurnWasSkipped == TRUE){
+    gDPSetFillColor(displayListPtr++, screenRed);
+  }else{
+    gDPSetFillColor(displayListPtr++, (turnCount%2==0) ? screenBlack : screenWhite);
+  }
   gDPFillRectangle(displayListPtr++, (int)(SCREEN_WD/3)-1, 0, (int)(SCREEN_WD/3)*2-1, bannerHeight);
   gDPNoOp(displayListPtr++);
   gDPPipeSync(displayListPtr++);
 
+  // black behind 3rd, 3rd
   gDPSetCycleType(displayListPtr++, G_CYC_FILL);
   gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
   gDPSetFillColor(displayListPtr++, screenBlack);
@@ -1139,6 +1176,7 @@ void drawBanner(){
   gDPNoOp(displayListPtr++);
   gDPPipeSync(displayListPtr++);
 
+  //line underneath the header
   gDPSetCycleType(displayListPtr++, G_CYC_FILL);
   gDPSetRenderMode(displayListPtr++, G_RM_OPA_SURF, G_RM_OPA_SURF);
   gDPSetFillColor(displayListPtr++, screenBlack);
