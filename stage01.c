@@ -74,8 +74,10 @@ float xLocation[MAX_PLAYERS];
 float zLocation[MAX_PLAYERS];
 float xGoal[MAX_PLAYERS];
 float zGoal[MAX_PLAYERS];
-int blackScore;
-int whiteScore;
+int blackCaptureScore;
+int whiteCaptureScore;
+int blackTerritoryScore;
+int whiteTerritoryScore;
 int bScoreLoc;
 int wScoreLoc;
 const Vec2d whitePotLocation = {425.0f,0.0f};
@@ -95,6 +97,18 @@ int currentCaptureGroupReachedEmpty;
 // if the array size is changed, change the for loop limit in the resetCaptureGroup function too
 Vec2d pebblesInCurrentCaptureGroup[100];
 int currentCaptureGroupIndex;
+/*---------------------------*/
+
+/* territory variables --------*/
+int currentTerritoryGroupColour;
+int currentTerritoryGroupReachedPebble;
+int currentTerritoryGroupReachedWrongPebble;
+// if the array size is changed, change the for loop limit in the resetCaptureGroup function too
+Vec2d pebblesInCurrentTerritoryGroup[100];
+int currentTerritoryGroupIndex;
+Vec2d spacesAlreadyCheckedForTerritory[100];
+int spacesCheckedForTerritoryIndex;
+
 /*---------------------------*/
 
 /*----- functions -----------*/
@@ -179,12 +193,17 @@ void initStage01() {
 
   timer = 0;
 	turnCount = 0;
-  blackScore = 0;
-  whiteScore = 0;
+  blackCaptureScore = 0;
+  whiteCaptureScore = 0;
+  blackTerritoryScore = 0;
+  whiteTerritoryScore = 0;
   maxTurns = 10;
   gameOver = FALSE;  
   gamePause = FALSE;
   btn_down = FALSE;
+
+  thisTurnWasSkipped = FALSE;
+  lastTurnWasSkipped = FALSE;
 
   // debug
   debugMode = FALSE;
@@ -241,6 +260,7 @@ void takeTurn(int padNo){
     // osSyncPrintf("Turn taken from player %d", padNo);
     placeCounter(padNo);
     checkForCaptures(padNo);
+    calculateTerritories();
     checkGameOver();
 }
 void readController(int padNo){
@@ -464,9 +484,9 @@ void removePebble(int x, int y){
     board[x][y].isEmpty = TRUE;
     movePebbleToDiscardPot(board[x][y].content);
     if((*board[x][y].content).colour == WHITE){
-      blackScore++;
+      blackCaptureScore++;
     }else{
-      whiteScore++;
+      whiteCaptureScore++;
     }
     board[x][y].content = NULL;
   }
@@ -476,12 +496,12 @@ void movePebbleToDiscardPot(Pebble *pebble){
     // move captured white pebbles to the pile
     (*pebble).position.x = whitePotLocation.x;
     // makes the pebbles rise
-    (*pebble).position.y = blackScore * 10;
+    (*pebble).position.y = blackCaptureScore * 10;
     (*pebble).position.z = whitePotLocation.y;
   }else{
     // move captured black pebbles to the pile
     (*pebble).position.x = blackPotLocation.x;
-    (*pebble).position.y = whiteScore * 10;
+    (*pebble).position.y = whiteCaptureScore * 10;
     (*pebble).position.z = blackPotLocation.y;
   }
 }
@@ -493,10 +513,13 @@ void undoPebblePlace(padNo){
   thisTurnWasSkipped = FALSE;
 }
 void passTurn(){
-  lastTurnWasSkipped = thisTurnWasSkipped;
-  thisTurnWasSkipped = TRUE;
-  turnCount++;
-  checkGameOver();
+  // cant skip on first two turns
+  if(turnCount > 1){
+    lastTurnWasSkipped = thisTurnWasSkipped;
+    thisTurnWasSkipped = TRUE;
+    turnCount++;
+    checkGameOver();
+  }
 }
 void placeCounter(int padNo) {
 	if(board[cursorPos[padNo].x][cursorPos[padNo].y].isEmpty == TRUE){
@@ -629,6 +652,113 @@ int isInCurrentCaptureGroup(int x, int y){
     // osSyncPrintf("comparing at index: %d",k);
     // osSyncPrintf("x: %d, y: %d",pebblesInCurrentCaptureGroup[k].x,pebblesInCurrentCaptureGroup[k].y);
     if(pebblesInCurrentCaptureGroup[k].x == x && pebblesInCurrentCaptureGroup[k].y == y){
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+void calculateTerritories(){
+  whiteTerritoryScore = 0;
+  blackTerritoryScore = 0;
+  // spacesCheckedForTerritoryIndex = 0;
+          resetTerritoryGroup();
+
+  if( turnCount > 1 ){
+    for(i=0;i<squareCount; ++i){   
+      for(o=0;o<squareCount; ++o){
+        //calculate the territories, very similar to capture checking except no capturing takes place
+        if(board[i][o].isEmpty == TRUE && isInCurrentTerritoryGroup(i,o) == FALSE){
+          // osSyncPrintf("\n-----A capture chain has begun-----\n");
+          // set values for current check
+          currentTerritoryGroupReachedWrongPebble = FALSE;
+          currentTerritoryGroupReachedPebble = FALSE;
+          // currentTerritoryGroupColour = (*board[i][o].content).colour;
+          // osSyncPrintf("Starting from %d,%d, colour is: %d\n",i,o,currentCaptureGroupColour);
+          // add current to list of pebbles checked
+          // addToTerritoryPlacesChecked(i,o);
+          pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].x = i;
+          pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].y = o;
+          currentTerritoryGroupIndex++;
+
+          // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].x = i;
+          // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].y = o;
+          // spacesCheckedForTerritoryIndex++;
+
+          startCheckingTerritoriesFromHere(i,o);
+          // after the checks occured the spaces put into the array should be the current territory to capture,
+          // if the checks never reached an empty space then capture the pieces
+          if(currentTerritoryGroupReachedWrongPebble == FALSE){
+            // osSyncPrintf("-------The capture group found an enclosed section!-----\n");
+            if(currentTerritoryGroupColour == WHITE){
+              whiteTerritoryScore += currentTerritoryGroupIndex;
+            }else{
+              blackTerritoryScore += currentTerritoryGroupIndex;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+void resetTerritoryGroup(){
+  currentTerritoryGroupIndex = 0;
+  // for (i=0;i<100;i++){
+  //   pebblesInCurrentCaptureGroup[i] = NULL;
+  // }
+}
+void startCheckingTerritoriesFromHere(int x, int y){
+  // osSyncPrintf("expanding checking from %d,%d\n",x,y);
+  checkTerritoryContinues(x+1,y  );
+  checkTerritoryContinues(x  ,y+1);
+  checkTerritoryContinues(x-1,y  );
+  checkTerritoryContinues(x  ,y-1);
+}
+void checkTerritoryContinues(int x, int y){
+  // osSyncPrintf("continue checking %d,%d\n",x,y);
+  if(isOffBoard(x,y) == FALSE ){
+    if(board[x][y].isEmpty == TRUE /*&& isAlreadyCheckedForTerritory(x,y) == FALSE*/){
+      if(isInCurrentTerritoryGroup(x,y) == FALSE){
+        // Found an empty space in the capture, so stop altogether
+        // osSyncPrintf("%d,%d reached empty\n",x,y);
+        pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].x = x;
+        pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].y = y;
+        currentTerritoryGroupIndex++;
+
+        // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].x = x;
+        // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].y = y;
+        // spacesCheckedForTerritoryIndex++;
+        // osSyncPrintf("%d,%d was correct and the search continues\n",x,y);
+        startCheckingTerritoriesFromHere(x,y);
+      }
+    //  only continue if the space is on the board, same colour as the current group, and other checks haven't found empty space.
+    }else if(currentTerritoryGroupReachedPebble == FALSE){
+      currentTerritoryGroupColour = (*board[x][y].content).colour;
+      currentTerritoryGroupReachedPebble = TRUE;
+    }else if(currentTerritoryGroupReachedPebble == TRUE){
+      //second time reaching a pebble, best be the same colour as before or we are stopping
+      if(currentTerritoryGroupColour != (*board[x][y].content).colour){
+        currentTerritoryGroupReachedWrongPebble = TRUE;
+      }
+    }
+  }
+}
+int isInCurrentTerritoryGroup(int x, int y){
+  // osSyncPrintf("/\\/\\ welcome to the isInCUrrentCaptureGroup function! /\\/\\\n");
+  for(k=0;k<currentTerritoryGroupIndex;k++){
+    // osSyncPrintf("comparing at index: %d",k);
+    // osSyncPrintf("x: %d, y: %d",pebblesInCurrentCaptureGroup[k].x,pebblesInCurrentCaptureGroup[k].y);
+    if(pebblesInCurrentTerritoryGroup[k].x == x && pebblesInCurrentTerritoryGroup[k].y == y){
+      return TRUE;
+    }
+  }
+  return FALSE;
+}
+int isAlreadyCheckedForTerritory(int x, int y){
+  // osSyncPrintf("/\\/\\ welcome to the isInCUrrentCaptureGroup function! /\\/\\\n");
+  for(k=0;k<spacesCheckedForTerritoryIndex;k++){
+    // osSyncPrintf("comparing at index: %d",k);
+    // osSyncPrintf("x: %d, y: %d",pebblesInCurrentCaptureGroup[k].x,pebblesInCurrentCaptureGroup[k].y);
+    if(spacesAlreadyCheckedForTerritory[k].x == x && spacesAlreadyCheckedForTerritory[k].y == y){
       return TRUE;
     }
   }
@@ -944,12 +1074,12 @@ void makeDL01() {
       Draw8Font(114,120,TEX_COL_WHITE,0);
       }
     }else{
-      sprintf(outstring,"White - %d",whiteScore);
+      sprintf(outstring,"White - %d",whiteCaptureScore + whiteTerritoryScore);
       wScoreLoc = 7;
       Draw8Font(wScoreLoc,5, TEX_COL_BLACK, 0);
 
-      sprintf(outstring,"%d - Black",blackScore);
-      bScoreLoc = 252 - 8 * numDigits(blackScore); 
+      sprintf(outstring,"%d - Black",blackCaptureScore + blackTerritoryScore);
+      bScoreLoc = 252 - 8 * numDigits(blackCaptureScore + blackTerritoryScore); 
       Draw8Font(bScoreLoc,5, TEX_COL_WHITE, 0);
     }
   }else{
@@ -960,10 +1090,10 @@ void makeDL01() {
     //   sprintf(outstring,"PR");
     //   Draw8Font(110,110, TEX_COL_BLACK, 0);
     // }  
-    sprintf(outstring,"%s WINS!", (blackScore > whiteScore) ? "BLACK":"WHITE");
+    sprintf(outstring,"%s WINS!", (blackCaptureScore > whiteCaptureScore) ? "BLACK":"WHITE");
     Draw8Font(120, 130, TEX_COL_WHITE, 0);
-    // sprintf(outstring,"White - %d vs %d - Black",whiteScore, blackScore);
-    // Draw8Font(8*(int)numDigits(whiteScore+blackScore)/2,110, TEX_COL_WHITE, 0);
+    // sprintf(outstring,"White - %d vs %d - Black",whiteCaptureScore, blackCaptureScore);
+    // Draw8Font(8*(int)numDigits(whiteCaptureScore+blackCaptureScore)/2,110, TEX_COL_WHITE, 0);
   }
   // drawHudGraphic(turnCount);
   
@@ -996,10 +1126,10 @@ void makeDL01() {
     // nuDebConCPuts(0, conbuf);
 
     // nuDebConTextPos(0,0,0);
-    // sprintf(conbuf,"White: %d",whiteScore);
+    // sprintf(conbuf,"White: %d",whiteCaptureScore);
     // nuDebConCPuts(0, conbuf);
     // nuDebConTextPos(0,0,1);
-    // sprintf(conbuf,"Black: %d",blackScore);
+    // sprintf(conbuf,"Black: %d",blackCaptureScore);
     // nuDebConCPuts(0, conbuf);
     // nuDebConTextPos(0,0,3);
     // sprintf(conbuf,"Turns: %d",turnCount);
