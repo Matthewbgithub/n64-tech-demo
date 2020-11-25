@@ -108,7 +108,7 @@ Vec2d pebblesInCurrentTerritoryGroup[100];
 int currentTerritoryGroupIndex;
 Vec2d spacesAlreadyCheckedForTerritory[100];
 int spacesCheckedForTerritoryIndex;
-
+int sizeOfTerritory;
 /*---------------------------*/
 
 /*----- functions -----------*/
@@ -197,7 +197,7 @@ void initStage01() {
   whiteCaptureScore = 0;
   blackTerritoryScore = 0;
   whiteTerritoryScore = 0;
-  maxTurns = 10;
+  maxTurns = 200;
   gameOver = FALSE;  
   gamePause = FALSE;
   btn_down = FALSE;
@@ -279,7 +279,7 @@ void readController(int padNo){
         padNoThatPaused = padNo;
         setDefaultCamera();
         nuAuSeqPlayerSetVol(0,0x1fff);
-      }else{
+      }else if(padNoThatPaused == padNo){
         gamePause = FALSE;
         nuAuSeqPlayerSetVol(0,0x3fff);
       }
@@ -662,6 +662,7 @@ void calculateTerritories(){
   blackTerritoryScore = 0;
   // spacesCheckedForTerritoryIndex = 0;
           resetTerritoryGroup();
+  sizeOfTerritory = 0;
 
   if( turnCount > 1 ){
     for(i=0;i<squareCount; ++i){   
@@ -670,6 +671,8 @@ void calculateTerritories(){
         if(board[i][o].isEmpty == TRUE && isInCurrentTerritoryGroup(i,o) == FALSE){
           // osSyncPrintf("\n-----A capture chain has begun-----\n");
           // set values for current check
+          sizeOfTerritory = 0;
+
           currentTerritoryGroupReachedWrongPebble = FALSE;
           currentTerritoryGroupReachedPebble = FALSE;
           // currentTerritoryGroupColour = (*board[i][o].content).colour;
@@ -679,7 +682,7 @@ void calculateTerritories(){
           pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].x = i;
           pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].y = o;
           currentTerritoryGroupIndex++;
-
+          sizeOfTerritory++;
           // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].x = i;
           // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].y = o;
           // spacesCheckedForTerritoryIndex++;
@@ -690,9 +693,13 @@ void calculateTerritories(){
           if(currentTerritoryGroupReachedWrongPebble == FALSE){
             // osSyncPrintf("-------The capture group found an enclosed section!-----\n");
             if(currentTerritoryGroupColour == WHITE){
-              whiteTerritoryScore += currentTerritoryGroupIndex;
+              // whiteTerritoryScore += currentTerritoryGroupIndex;
+              whiteTerritoryScore += sizeOfTerritory;
+              sizeOfTerritory = 0;
             }else{
-              blackTerritoryScore += currentTerritoryGroupIndex;
+              // blackTerritoryScore += currentTerritoryGroupIndex;
+              blackTerritoryScore += sizeOfTerritory;
+              sizeOfTerritory = 0;
             }
           }
         }
@@ -723,7 +730,7 @@ void checkTerritoryContinues(int x, int y){
         pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].x = x;
         pebblesInCurrentTerritoryGroup[currentTerritoryGroupIndex].y = y;
         currentTerritoryGroupIndex++;
-
+        sizeOfTerritory++;
         // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].x = x;
         // spacesAlreadyCheckedForTerritory[spacesCheckedForTerritoryIndex].y = y;
         // spacesCheckedForTerritoryIndex++;
@@ -848,7 +855,7 @@ void makeDL01() {
   if(gameOver == FALSE){
     gDPSetFillColor(displayListPtr++, screenWhite);
   }else{
-    gDPSetFillColor(displayListPtr++, GPACK_RGBA5551(128, 128, 128, 1));
+    gDPSetFillColor(displayListPtr++, (blackCaptureScore+blackTerritoryScore > whiteCaptureScore+whiteTerritoryScore) ? screenBlack:screenWhite);
   }
   gDPFillRectangle(displayListPtr++, 0, 0, SCREEN_WD-1, SCREEN_HT-1);
   gDPNoOp(displayListPtr++);
@@ -1090,8 +1097,8 @@ void makeDL01() {
     //   sprintf(outstring,"PR");
     //   Draw8Font(110,110, TEX_COL_BLACK, 0);
     // }  
-    sprintf(outstring,"%s WINS!", (blackCaptureScore > whiteCaptureScore) ? "BLACK":"WHITE");
-    Draw8Font(120, 130, TEX_COL_WHITE, 0);
+    sprintf(outstring,"%s WINS!", (blackCaptureScore+blackTerritoryScore > whiteCaptureScore+whiteTerritoryScore) ? "BLACK":"WHITE");
+    Draw8Font(120, 130, (blackCaptureScore+blackTerritoryScore > whiteCaptureScore+whiteTerritoryScore) ? TEX_COL_WHITE:TEX_COL_BLACK, 0);
     // sprintf(outstring,"White - %d vs %d - Black",whiteCaptureScore, blackCaptureScore);
     // Draw8Font(8*(int)numDigits(whiteCaptureScore+blackCaptureScore)/2,110, TEX_COL_WHITE, 0);
   }
