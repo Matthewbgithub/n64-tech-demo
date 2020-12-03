@@ -395,7 +395,7 @@ void setDefaultCamera(){
   cameraPos.x = 0.0f;
   cameraPos.y = 0.0f;
   cameraPos.z = 0.0f;
-  cameraDistance = 7.0f*(squareCount*squareCount) + 250.0f;
+  cameraDistance = 7.0f*(squareCount*squareCount) + 300.0f;
   cameraRotation.x = 0.0f;
   cameraRotation.y = 1.0f;
   cameraRotation.z = 0.0f;
@@ -1030,6 +1030,21 @@ void makeDL01() {
         if(nuContStatus[padNo].errno != 0){
         continue;
         }
+        
+        if(turnCount%2 == padNo){
+          //dont display the square if not that players turn
+          CURRENT_GFX++;
+          guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 0.0f, zGoal[padNo]);
+          gSPMatrix(displayListPtr++,
+              OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
+              G_MTX_MODELVIEW | // operating on the modelview matrix stack...
+              G_MTX_PUSH | // ...push another matrix onto the stack...
+              G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
+            );
+          drawTransModel(Wtx_selectionring);
+          gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
+        }
+
         CURRENT_GFX++;
         guPosition(&gfxTask->objectTransforms[CURRENT_GFX], 0.0f, timer*2%360, 0.0f, 0.6f, xLocation[padNo], (turnCount % 2 == padNo) ? 40 + 20*sin((float)timer/30.0f+padNo*2) : 30, zLocation[padNo]);
         gSPMatrix(displayListPtr++,
@@ -1045,20 +1060,6 @@ void makeDL01() {
           drawSmoothModel(Wtx_pebble_white);
         }
         gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-        
-        if(turnCount%2 == padNo){
-          //dont display the square if not that players turn
-          CURRENT_GFX++;
-          guPosition(&gfxTask->objectTransforms[CURRENT_GFX],0.0f,0.0f,0.0f,2.5f, xGoal[padNo], 0.0f, zGoal[padNo]);
-          gSPMatrix(displayListPtr++,
-              OS_K0_TO_PHYSICAL(&(gfxTask->objectTransforms[CURRENT_GFX])),
-              G_MTX_MODELVIEW | // operating on the modelview matrix stack...
-              G_MTX_PUSH | // ...push another matrix onto the stack...
-              G_MTX_MUL // ...which is multipled by previously-top matrix (eg. a relative transformation)
-            );
-          drawTransModel(Wtx_selectionring);
-          gSPPopMatrix(displayListPtr++, G_MTX_MODELVIEW);
-        }
       }	
       drawBanner();
     }
